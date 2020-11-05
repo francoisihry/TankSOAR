@@ -1,0 +1,134 @@
+:root {
+    --main-color-beige: #E8DFD1;
+    --main-color-red: #852E30;
+    --main-color-blue: #6CA2C3;
+    --main-onhover-blue: #8BB3C6;
+    --main-background-color-blue: #36566B;
+
+}
+
+@font-face {
+  font-family: 'Candara';
+  src: local('Candara'), url(./styles/fonts/Candara.woff) format('woff');
+}
+
+/*body {*/
+/*    margin: 0;*/
+/*    font-family: Candara;*/
+/*    -webkit-font-smoothing: antialiased;*/
+/*    -moz-osx-font-smoothing: grayscale;*/
+/*    background-color: var(--main-background-color-blue);*/
+/*    color: var(--main-color-beige);*/
+/*}*/
+
+/*code {*/
+/*    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',*/
+/*    monospace;*/
+/*}*/
+
+/*html,*/
+/*body,*/
+/*#root {*/
+/*    font-family: Candara;*/
+/*    height: 100%;*/
+/*}*/
+
+.tank_red_background_color {
+    background-color: var(--main-color-red);;
+}
+
+/*.tank_beige_color {*/
+/*    color: var(--main-color-beige);*/
+/*}*/
+
+.tank_red_color {
+    color: var(--main-color-red);
+}
+
+/*icon sizes*/
+/*.tank-edit-icon-size {*/
+/*    width: 25px;*/
+/*}*/
+
+/*.tank-save-icon-size {*/
+/*    width: 25px;*/
+/*}*/
+
+/*.tank-undo-icon-size {*/
+/*    width: 25px;*/
+/*}*/
+
+/*.tank-delete-icon-size {*/
+/*    width: 20px;*/
+/*}*/
+
+
+/*blue icons*/
+/*.tank_icons_blue {*/
+/*    fill: var(--main-color-blue);*/
+/*}*/
+
+/*.tank_icons_blue:hover {*/
+/*    cursor: pointer;*/
+/*    fill: var(--main-onhover-blue);*/
+/*}*/
+
+/*Header*/
+.tank_wheel_text_color {
+    fill: #F5D7A8;
+}
+
+.tank_wheel_bg_color {
+    fill: var(--main-color-blue);
+}
+
+.tank_wheel_text_size {
+    font-size: 1.2em;
+    font-family: Impact;
+}
+
+
+/*Navbar*/
+.tank_navbar_background_color {
+    background-color: #403936;
+}
+
+.tank_navbar_border {
+    border: 2px #F4D798 solid;
+}
+
+.tank_navbar_text_color {
+    color: var(--main-onhover-blue);
+}
+
+/*Errors*/
+/*.tank-error-msg-color {*/
+/*    color: #FFB5B2;*/
+/*    background-color: #452C2F;*/
+/*    border-color: #573238;*/
+/*}*/
+
+/*Forms*/
+/*.tank_form_button {*/
+/*    background-color: #6CA2C3;*/
+/*    color: #F5D7A8;*/
+/*    text-decoration: none;*/
+/*    border-style: solid;*/
+/*    border-color: #2F5184;*/
+/*    font-family: Impact;*/
+/*    border-width: 2px;*/
+/*    text-align: center;*/
+/*    vertical-align: middle;*/
+/*    cursor: pointer;*/
+/*    font-weight: 400;*/
+/*    padding: .5rem 1rem;*/
+/*    font-size: 1.25rem;*/
+/*    line-height: 1.5;*/
+/*    border-radius: .3rem;*/
+/*}*/
+
+/*.tank_form_button:hover,*/
+/*.tank_form_button:active {*/
+/*    background-color: #8BB3C6;*/
+/*    color: var(--main-color-beige);*/
+/*}*/

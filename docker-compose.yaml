@@ -1,0 +1,54 @@
+version: '2'
+services:
+  # NEW
+  reverse_proxy:
+    build:
+      context: ./reverse_proxy
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./reverse_proxy/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - 80:80
+    depends_on:
+      - backend
+      - frontend
+
+  backend:
+    stdin_open: true
+    command: python manage.py runserver 0.0.0.0:8000
+    build:
+      context: ./tank_backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./tank_backend:/app"
+    env_file:
+      - ./tank_backend/conf.env
+      - ./db_conf.env
+
+  db:
+    image: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - db:/var/lib/postgresql/data/
+    env_file:
+      - ./db_conf.env
+
+  frontend:
+    stdin_open: true
+    command: yarn run start
+    build:
+      context: ./tank_frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - "/app/node_modules"
+      - "./tank_frontend:/app"
+    env_file:
+      - ./tank_frontend/conf.env
+
+volumes:
+  db:
