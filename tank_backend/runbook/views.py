@@ -27,7 +27,6 @@ class CanEditRunbookOrReadOnly(BasePermission):
 class RunbookViewSet(viewsets.ModelViewSet):
     """
     Url: /api/runbooks/
-    Get all the runbooks as list.
     """
     lookup_value_regex = r'[\w.@-]+' # regex to match any name in the url
 

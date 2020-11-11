@@ -3,19 +3,13 @@ from django.urls import path, include
 from rest_framework import routers
 from access.views import UserViewSet, Me, Settings, set_csrf_token, login_view, logout_view
 from runbook.views import RunbookViewSet
-# from rest_framework_simplejwt.views import (
-#     # TokenObtainPairView,
-#     TokenRefreshView,
-#     TokenVerifyView
-# )
+
 from rest_framework.schemas import get_schema_view
 
-# from access.views import TokenAuthenticationView
 
 router = routers.DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'runbooks', RunbookViewSet, basename='runbook')
-# router.register(r'me', views.MeViewSet, basename='me')
 
 urlpatterns = [
     path('api/', include(router.urls)),

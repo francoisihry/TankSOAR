@@ -43,7 +43,7 @@ class CanEditUser(permissions.BasePermission):
         if request.user.is_super_admin:
             if obj.is_super_admin:
                 # prevent from destroying superadmin
-                if view.action is 'destroy':
+                if view.action == 'destroy':
                     return False
                 return not ('username' in request.data.keys() or 'roles' in request.data.keys())
             else:

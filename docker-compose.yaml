@@ -1,6 +1,5 @@
 version: '2'
 services:
-  # NEW
   reverse_proxy:
     build:
       context: ./reverse_proxy
@@ -12,7 +11,6 @@ services:
     depends_on:
       - backend
       - frontend
-
   backend:
     stdin_open: true
     command: python manage.py runserver 0.0.0.0:8000
@@ -26,7 +24,6 @@ services:
     env_file:
       - ./tank_backend/conf.env
       - ./db_conf.env
-
   db:
     image: postgres
     ports:
@@ -35,7 +32,6 @@ services:
       - db:/var/lib/postgresql/data/
     env_file:
       - ./db_conf.env
-
   frontend:
     stdin_open: true
     command: yarn run start
@@ -49,6 +45,5 @@ services:
       - "./tank_frontend:/app"
     env_file:
       - ./tank_frontend/conf.env
-
 volumes:
   db:

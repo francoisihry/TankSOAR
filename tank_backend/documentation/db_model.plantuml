@@ -1,0 +1,37 @@
+@startuml
+
+class TankUser {
+    username :str [Primary Key]
+    last_login : timestamp
+    email : str
+}
+
+class Role {
+    type : "'ANALYST' or 'DEVELOPER' or 'ADMIN' [Primary Key]"
+}
+
+class Settings {
+    id : int [Primary Key]
+    timezone : str
+}
+
+class Runbook {
+    name : str [Primary Key]
+    content : str
+    created_at : timestamp
+    updated_at : timestamp
+}
+
+class Worker {
+    id : int [Primary Key]
+    stdout : str
+    stderr : str
+    status : "'FINISHED' or 'RUNNING' or 'ERROR'"
+}
+
+TankUser "1" -- "1" Settings : settings
+
+TankUser "0 .. n" -- "0 .. nbRoles" Role : roles
+
+Worker "0 .. n" -- "0 .. n" Runbook : runbook
+@enduml
