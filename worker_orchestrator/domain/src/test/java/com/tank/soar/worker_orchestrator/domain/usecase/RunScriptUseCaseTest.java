@@ -46,8 +46,12 @@ public class RunScriptUseCaseTest {
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(worker).when(workerContainerManager).runScript("script");
-        final ContainerMetadata containerMetadata = mock(ContainerMetadata.class);
-        doReturn(containerMetadata).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
+        final ContainerInternalData containerInternalData = mock(ContainerInternalData.class);
+        doReturn(containerInternalData).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
+        final WorkerLog stdOut = mock(WorkerLog.class);
+        doReturn(stdOut).when(workerContainerManager).getStdOut(new WorkerId("id"));
+        final WorkerLog stdErr = mock(WorkerLog.class);
+        doReturn(stdErr).when(workerContainerManager).getStdErr(new WorkerId("id"));
         final InOrder inOrder = inOrder(workerRepository, transactionalUseCase);
 
         // When
@@ -55,7 +59,7 @@ public class RunScriptUseCaseTest {
 
         // Then
         inOrder.verify(transactionalUseCase).begin();
-        inOrder.verify(workerRepository).saveWorker(worker, containerMetadata);
+        inOrder.verify(workerRepository).saveWorker(worker, containerInternalData, stdOut, stdErr);
         inOrder.verify(transactionalUseCase).commit();
     }
 

@@ -31,26 +31,28 @@ public class RetrieveWorkerStdErrUseCaseTest {
     @Test
     public void should_get_stderr_from_container_when_exists() throws Exception {
         // Given
-        doReturn("stdErr").when(workerContainerManager).getStdErr(new WorkerId("id"));
+        final WorkerLog workerLog = mock(WorkerLog.class);
+        doReturn(workerLog).when(workerContainerManager).getStdErr(new WorkerId("id"));
 
         // When
-        final String stdErr = retrieveWorkerStdErrUseCase.execute(RetrieveWorkerStdErrCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+        final WorkerLog stdErr = retrieveWorkerStdErrUseCase.execute(RetrieveWorkerStdErrCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
 
         // Then
-        assertThat(stdErr).isEqualTo("stdErr");
+        assertThat(stdErr).isEqualTo(workerLog);
     }
 
     @Test
     public void should_get_stderr_from_repository_when_worker_container_is_deleted() throws Exception {
         // Given
         doThrow(new UnknownWorkerException(new WorkerId("id"))).when(workerContainerManager).getStdErr(new WorkerId("id"));
-        doReturn("stdErr").when(workerRepository).getStdErr(new WorkerId("id"));
+        final WorkerLog workerLog = mock(WorkerLog.class);
+        doReturn(workerLog).when(workerRepository).getStdErr(new WorkerId("id"));
 
         // When
-        final String stdErr = retrieveWorkerStdErrUseCase.execute(RetrieveWorkerStdErrCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+        final WorkerLog stdErr = retrieveWorkerStdErrUseCase.execute(RetrieveWorkerStdErrCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
 
         // Then
-        assertThat(stdErr).isEqualTo("stdErr");
+        assertThat(stdErr).isEqualTo(workerLog);
     }
 
     @Test

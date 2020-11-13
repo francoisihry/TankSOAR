@@ -34,8 +34,12 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(Collections.singletonList(worker)).when(workerContainerManager).listAllContainers();
-        final ContainerMetadata containerMetadata = mock(ContainerMetadata.class);
-        doReturn(containerMetadata).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
+        final ContainerInternalData containerInternalData = mock(ContainerInternalData.class);
+        doReturn(containerInternalData).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
+        final WorkerLog stdOut = mock(WorkerLog.class);
+        doReturn(stdOut).when(workerContainerManager).getStdOut(new WorkerId("id"));
+        final WorkerLog stdErr = mock(WorkerLog.class);
+        doReturn(stdErr).when(workerContainerManager).getStdErr(new WorkerId("id"));
         final InOrder inOrder = inOrder(workerRepository, transactionalUseCase);
 
         // When
@@ -43,7 +47,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
 
         // Then
         inOrder.verify(transactionalUseCase).begin();
-        inOrder.verify(workerRepository).saveWorker(worker, containerMetadata);
+        inOrder.verify(workerRepository).saveWorker(worker, containerInternalData, stdOut, stdErr);
         inOrder.verify(transactionalUseCase).commit();
     }
 
@@ -60,7 +64,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
-        verify(workerContainerManager, times(0)).removeContainer(any());
+        verify(workerContainerManager, times(0)).deleteContainer(any());
     }
 
     @Test
@@ -76,7 +80,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
-        verify(workerContainerManager, times(1)).removeContainer(new WorkerId("id"));
+        verify(workerContainerManager, times(1)).deleteContainer(new WorkerId("id"));
     }
 
     @Test
@@ -92,7 +96,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
-        verify(workerContainerManager, times(1)).removeContainer(new WorkerId("id"));
+        verify(workerContainerManager, times(1)).deleteContainer(new WorkerId("id"));
     }
 
 }

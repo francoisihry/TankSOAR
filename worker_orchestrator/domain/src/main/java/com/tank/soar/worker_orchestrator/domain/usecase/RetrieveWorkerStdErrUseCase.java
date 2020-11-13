@@ -4,7 +4,7 @@ import com.tank.soar.worker_orchestrator.domain.*;
 
 import java.util.Objects;
 
-public class RetrieveWorkerStdErrUseCase implements UseCase<RetrieveWorkerStdErrCommand, String> {
+public class RetrieveWorkerStdErrUseCase implements UseCase<RetrieveWorkerStdErrCommand, WorkerLog> {
 
     private final WorkerContainerManager workerContainerManager;
     private final WorkerRepository workerRepository;
@@ -19,7 +19,7 @@ public class RetrieveWorkerStdErrUseCase implements UseCase<RetrieveWorkerStdErr
     }
 
     @Override
-    public String execute(final RetrieveWorkerStdErrCommand command) throws UseCaseException {
+    public WorkerLog execute(final RetrieveWorkerStdErrCommand command) throws UseCaseException {
         final WorkerId workerId = command.workerId();
         try {
             return workerContainerManager.getStdErr(workerId);
@@ -27,7 +27,7 @@ public class RetrieveWorkerStdErrUseCase implements UseCase<RetrieveWorkerStdErr
             // can be expected
             try {
                 transactionalUseCase.begin();
-                final String stdErr = workerRepository.getStdErr(workerId);
+                final WorkerLog stdErr = workerRepository.getStdErr(workerId);
                 transactionalUseCase.commit();
                 return stdErr;
             } catch (final UnknownWorkerException unknownWorkerException1) {

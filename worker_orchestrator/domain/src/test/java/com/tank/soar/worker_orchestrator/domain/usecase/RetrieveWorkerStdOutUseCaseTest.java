@@ -1,9 +1,6 @@
 package com.tank.soar.worker_orchestrator.domain.usecase;
 
-import com.tank.soar.worker_orchestrator.domain.UnknownWorkerException;
-import com.tank.soar.worker_orchestrator.domain.WorkerContainerManager;
-import com.tank.soar.worker_orchestrator.domain.WorkerId;
-import com.tank.soar.worker_orchestrator.domain.WorkerRepository;
+import com.tank.soar.worker_orchestrator.domain.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,26 +31,28 @@ public class RetrieveWorkerStdOutUseCaseTest {
     @Test
     public void should_get_stdout_from_container_when_exists() throws Exception {
         // Given
-        doReturn("stdOut").when(workerContainerManager).getStdOut(new WorkerId("id"));
+        final WorkerLog workerLog = mock(WorkerLog.class);
+        doReturn(workerLog).when(workerContainerManager).getStdOut(new WorkerId("id"));
 
         // When
-        final String stdOut = retrieveWorkerStdOutUseCase.execute(RetrieveWorkerStdOutCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+        final WorkerLog stdOut = retrieveWorkerStdOutUseCase.execute(RetrieveWorkerStdOutCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
 
         // Then
-        assertThat(stdOut).isEqualTo("stdOut");
+        assertThat(stdOut).isEqualTo(workerLog);
     }
 
     @Test
     public void should_get_stdout_from_repository_when_worker_container_is_deleted() throws Exception {
         // Given
         doThrow(new UnknownWorkerException(new WorkerId("id"))).when(workerContainerManager).getStdOut(new WorkerId("id"));
-        doReturn("stdOut").when(workerRepository).getStdOut(new WorkerId("id"));
+        final WorkerLog workerLog = mock(WorkerLog.class);
+        doReturn(workerLog).when(workerRepository).getStdOut(new WorkerId("id"));
 
         // When
-        final String stdOut = retrieveWorkerStdOutUseCase.execute(RetrieveWorkerStdOutCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+        final WorkerLog stdOut = retrieveWorkerStdOutUseCase.execute(RetrieveWorkerStdOutCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
 
         // Then
-        assertThat(stdOut).isEqualTo("stdOut");
+        assertThat(stdOut).isEqualTo(workerLog);
     }
 
     @Test
