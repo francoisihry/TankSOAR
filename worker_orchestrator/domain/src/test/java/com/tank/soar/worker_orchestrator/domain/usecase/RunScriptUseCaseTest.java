@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
@@ -18,6 +20,8 @@ public class RunScriptUseCaseTest {
     private WorkerContainerManager workerContainerManager;
     private WorkerRepository workerRepository;
     private TransactionalUseCase transactionalUseCase;
+    private WorkerLog stdOut;
+    private WorkerLog stdErr;
 
     @BeforeEach
     public void setup() {
@@ -25,12 +29,19 @@ public class RunScriptUseCaseTest {
         workerRepository = mock(WorkerRepository.class);
         transactionalUseCase = mock(TransactionalUseCase.class);
         runScriptUseCase = new RunScriptUseCase(workerContainerManager, workerRepository, transactionalUseCase);
+        stdOut = mock(WorkerLog.class);
+        doReturn(Optional.of(stdOut)).when(workerContainerManager).getStdOut(new WorkerId("id"));
+        doReturn(new WorkerId("id")).when(stdOut).workerId();
+        stdErr = mock(WorkerLog.class);
+        doReturn(Optional.of(stdErr)).when(workerContainerManager).getStdErr(new WorkerId("id"));
+        doReturn(new WorkerId("id")).when(stdErr).workerId();
     }
 
     @Test
     public void should_return_worker_container() throws Exception {
         // Given
         final Worker worker = mock(Worker.class);
+        doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(worker).when(workerContainerManager).runScript("script");
 
         // When
@@ -46,12 +57,8 @@ public class RunScriptUseCaseTest {
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(worker).when(workerContainerManager).runScript("script");
-        final ContainerInternalData containerInternalData = mock(ContainerInternalData.class);
-        doReturn(containerInternalData).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
-        final WorkerLog stdOut = mock(WorkerLog.class);
-        doReturn(stdOut).when(workerContainerManager).getStdOut(new WorkerId("id"));
-        final WorkerLog stdErr = mock(WorkerLog.class);
-        doReturn(stdErr).when(workerContainerManager).getStdErr(new WorkerId("id"));
+        final ContainerInformation containerInformation = mock(ContainerInformation.class);
+        doReturn(containerInformation).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
         final InOrder inOrder = inOrder(workerRepository, transactionalUseCase);
 
         // When
@@ -59,7 +66,7 @@ public class RunScriptUseCaseTest {
 
         // Then
         inOrder.verify(transactionalUseCase).begin();
-        inOrder.verify(workerRepository).saveWorker(worker, containerInternalData, stdOut, stdErr);
+        inOrder.verify(workerRepository).createWorker(worker, "script", containerInformation, stdOut, stdErr);
         inOrder.verify(transactionalUseCase).commit();
     }
 

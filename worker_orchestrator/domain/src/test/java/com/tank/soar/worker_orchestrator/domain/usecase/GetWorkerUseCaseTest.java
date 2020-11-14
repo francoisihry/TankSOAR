@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -28,10 +30,10 @@ public class GetWorkerUseCaseTest {
     }
 
     @Test
-    public void should_get_worker_from_container_when_exists() throws Exception {
+    public void should_find_worker_from_container_when_exists() throws Exception {
         // Given
         final Worker worker = mock(Worker.class);
-        doReturn(worker).when(workerContainerManager).getContainer(new WorkerId("id"));
+        doReturn(Optional.of(worker)).when(workerContainerManager).findContainer(new WorkerId("id"));
 
         // When
         final Worker workerGet = getWorkerUseCase.execute(GetWorkerCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
@@ -41,10 +43,10 @@ public class GetWorkerUseCaseTest {
     }
 
     @Test
-    public void should_get_worker_from_repository_when_worker_container_is_deleted() throws Exception {
+    public void should_find_worker_from_repository_when_worker_container_is_deleted() throws Exception {
         // Given
         final Worker worker = mock(Worker.class);
-        doThrow(new UnknownWorkerException(new WorkerId("id"))).when(workerContainerManager).getContainer(new WorkerId("id"));
+        doReturn(Optional.empty()).when(workerContainerManager).findContainer(new WorkerId("id"));
         doReturn(worker).when(workerRepository).getWorker(new WorkerId("id"));
 
         // When
@@ -57,7 +59,7 @@ public class GetWorkerUseCaseTest {
     @Test
     public void should_get_worker_from_repository_execute_in_transactional_scope_when_worker_container_is_deleted() throws Exception {
         // Given
-        doThrow(new UnknownWorkerException(new WorkerId("id"))).when(workerContainerManager).getContainer(new WorkerId("id"));
+        doReturn(Optional.empty()).when(workerContainerManager).findContainer(new WorkerId("id"));
         final InOrder inOrder = inOrder(workerRepository, transactionalUseCase);
 
         // When
@@ -73,7 +75,7 @@ public class GetWorkerUseCaseTest {
     public void should_throw_UnknownWorkerUseCaseException_when_worker_container_is_deleted_and_worker_repository_is_not_present()
             throws Exception {
         // Given
-        doThrow(new UnknownWorkerException(new WorkerId("id"))).when(workerContainerManager).getContainer(new WorkerId("id"));
+        doReturn(Optional.empty()).when(workerContainerManager).findContainer(new WorkerId("id"));
         doThrow(new UnknownWorkerException(new WorkerId("id"))).when(workerRepository).getWorker(new WorkerId("id"));
 
         // When && Then
@@ -86,7 +88,7 @@ public class GetWorkerUseCaseTest {
     public void should_rollback_transaction_when_worker_container_is_deleted_and_worker_repository_is_not_present()
             throws Exception {
         // Given
-        doThrow(new UnknownWorkerException(new WorkerId("id"))).when(workerContainerManager).getContainer(new WorkerId("id"));
+        doReturn(Optional.empty()).when(workerContainerManager).findContainer(new WorkerId("id"));
         doThrow(new UnknownWorkerException(new WorkerId("id"))).when(workerRepository).getWorker(new WorkerId("id"));
 
         // When

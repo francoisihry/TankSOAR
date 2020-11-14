@@ -2,15 +2,15 @@ package com.tank.soar.worker_orchestrator.domain;
 
 public class UnableToRunScriptException extends Exception {
 
-    private final WorkerId unknownWorkerId;
+    private final WorkerId workerId;
 
-    public UnableToRunScriptException(final WorkerId unknownWorkerId, final Throwable cause) {
+    public UnableToRunScriptException(final WorkerId workerId, final Throwable cause) {
         super(cause);
-        this.unknownWorkerId = unknownWorkerId;
+        this.workerId = workerId;
     }
 
-    public WorkerId unknownWorkerId() {
-        return unknownWorkerId;
+    public WorkerId workerId() {
+        return workerId;
     }
 
 }

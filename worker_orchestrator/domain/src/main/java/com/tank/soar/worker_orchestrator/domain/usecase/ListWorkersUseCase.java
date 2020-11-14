@@ -30,8 +30,8 @@ public class ListWorkersUseCase implements UseCase<ListWorkersCommand, List<Work
 
     @Override
     public List<Worker> execute(final ListWorkersCommand command) {
-        final List<Worker> workersContainers = workerContainerManager.listAllContainers();
-        final List<Worker> workersDatabases = workerRepository.listAllWorkers();
+        final List<? extends Worker> workersContainers = workerContainerManager.listAllContainers();
+        final List<? extends Worker> workersDatabases = workerRepository.listAllWorkers();
         final Map<WorkerId, List<Worker>> workersByWorkerIds = Stream.concat(
                 workersContainers.stream(), workersDatabases.stream())
                 .collect(Collectors.groupingBy(Worker::workerId));

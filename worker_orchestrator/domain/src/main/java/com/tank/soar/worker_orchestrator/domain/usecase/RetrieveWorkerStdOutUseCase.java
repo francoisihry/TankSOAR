@@ -21,20 +21,19 @@ public class RetrieveWorkerStdOutUseCase implements UseCase<RetrieveWorkerStdOut
     @Override
     public WorkerLog execute(final RetrieveWorkerStdOutCommand command) throws UseCaseException {
         final WorkerId workerId = command.workerId();
-        try {
-            return workerContainerManager.getStdOut(workerId);
-        } catch (final UnknownWorkerException unknownWorkerException) {
-            // can be expected
-            try {
-                transactionalUseCase.begin();
-                final WorkerLog stdOut = workerRepository.getStdOut(workerId);
-                transactionalUseCase.commit();
-                return stdOut;
-            } catch (final UnknownWorkerException unknownWorkerException1) {
-                transactionalUseCase.rollback();
-                throw new UnknownWorkerUseCaseException(unknownWorkerException1.unknownWorkerId());
-            }
-        }
+        return workerContainerManager.getStdOut(workerId)
+                .orElseGet(() -> {
+                    // In this case it has been deleted because the container state is finished.
+                    try {
+                        transactionalUseCase.begin();
+                        final WorkerLog stdErr = workerRepository.getStdOut(workerId);
+                        transactionalUseCase.commit();
+                        return stdErr;
+                    } catch (final UnknownWorkerException unknownWorkerException1) {
+                        transactionalUseCase.rollback();
+                        throw new UnknownWorkerUseCaseException(unknownWorkerException1.unknownWorkerId());
+                    }
+                });
     }
 
 }
