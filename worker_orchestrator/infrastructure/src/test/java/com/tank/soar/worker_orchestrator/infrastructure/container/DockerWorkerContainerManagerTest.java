@@ -7,6 +7,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.util.Collections;
@@ -27,6 +29,8 @@ public class DockerWorkerContainerManagerTest {
     @Inject
     DockerClient dockerClient;
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(DockerWorkerContainerManagerTest.class);
+
     @AfterEach
     @BeforeEach
     public void removeWorkersContainers() {
@@ -35,7 +39,7 @@ public class DockerWorkerContainerManagerTest {
                 .withShowAll(true)
                 .exec()
                 .stream()
-                .peek(container -> String.format("Need to remove container '%s'", container.getId()))
+                .peek(container -> LOGGER.info(String.format("Need to remove container '%s'", container.getId())))
                 .forEach(container ->
                     dockerClient.removeContainerCmd(container.getId())
                             .withForce(true)
