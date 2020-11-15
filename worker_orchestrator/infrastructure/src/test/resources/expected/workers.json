@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "array",
+  "title": "The root schema",
+  "description": "The root schema comprises the entire JSON document.",
+  "default": [],
+  "examples": [
+    [
+      {
+        "lastUpdateStateDate": "2020-09-01T10:10:00",
+        "workerId": "id",
+        "workerStatus": "FINISHED"
+      }
+    ]
+  ],
+  "additionalItems": true,
+  "items": {
+    "$id": "#/items",
+    "anyOf": [
+      {
+        "$id": "#/items/anyOf/0",
+        "type": "object",
+        "title": "The first anyOf schema",
+        "description": "An explanation about the purpose of this instance.",
+        "default": {},
+        "examples": [
+          {
+            "lastUpdateStateDate": "2020-09-01T10:10:00",
+            "workerId": "id",
+            "workerStatus": "FINISHED"
+          }
+        ],
+        "required": [
+          "lastUpdateStateDate",
+          "workerId",
+          "workerStatus"
+        ],
+        "properties": {
+          "lastUpdateStateDate": {
+            "$id": "#/items/anyOf/0/properties/lastUpdateStateDate",
+            "type": "string",
+            "title": "The lastUpdateStateDate schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": "",
+            "examples": [
+              "2020-09-01T10:10:00"
+            ]
+          },
+          "workerId": {
+            "$id": "#/items/anyOf/0/properties/workerId",
+            "type": "string",
+            "title": "The workerId schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": "",
+            "examples": [
+              "id"
+            ]
+          },
+          "workerStatus": {
+            "$id": "#/items/anyOf/0/properties/workerStatus",
+            "type": "string",
+            "title": "The workerStatus schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": "",
+            "examples": [
+              "FINISHED"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    ]
+  }
+}

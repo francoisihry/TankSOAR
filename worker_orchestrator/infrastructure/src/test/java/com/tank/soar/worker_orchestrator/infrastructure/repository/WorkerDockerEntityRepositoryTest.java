@@ -1,0 +1,259 @@
+package com.tank.soar.worker_orchestrator.infrastructure.repository;
+
+import com.tank.soar.worker_orchestrator.domain.*;
+import com.tank.soar.worker_orchestrator.resources.PostgresqlTestResource;
+import io.agroal.api.AgroalDataSource;
+import io.quarkus.agroal.DataSource;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+
+import javax.inject.Inject;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.Month;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+
+@QuarkusTest
+@QuarkusTestResource(PostgresqlTestResource.class)
+public class WorkerDockerEntityRepositoryTest {
+
+    @Inject
+    @DataSource("workers")
+    AgroalDataSource workerDataSource;
+
+    @Inject
+    WorkerDockerEntityRepository workerDockerEntityRepository;
+
+    @BeforeEach
+    @AfterEach
+    public void flushAll() {
+        try (final Connection con = workerDataSource.getConnection();
+             final Statement stmt = con.createStatement()) {
+            stmt.executeUpdate("TRUNCATE TABLE WORKER");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    @Order(1)
+    public void should_tables_be_created_at_startup() {
+        assertThatCode(() -> {
+            try (final Connection con = workerDataSource.getConnection();
+                 final Statement stmt = con.createStatement();
+                 final ResultSet rsConsumedEvent = stmt.executeQuery("SELECT * FROM WORKER")) {
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        }).doesNotThrowAnyException();
+    }
+
+    @Test
+    @Order(2)
+    public void should_create_worker() throws SQLException {
+        // Given
+
+        // When
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+
+        // Then
+        try (final Connection con = workerDataSource.getConnection();
+             final Statement stmt = con.createStatement();
+             final ResultSet rsWorker = stmt.executeQuery("SELECT * FROM WORKER")) {
+
+            rsWorker.next();
+            assertThat(rsWorker.getString("workerId")).isEqualTo("id");
+            assertThat(rsWorker.getString("script")).isEqualTo("print(\"hello world\")");
+            assertThat(rsWorker.getString("workerStatus")).isEqualTo("CREATING");
+            assertThat(rsWorker.getObject("createdAt", LocalDateTime.class))
+                    .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
+            assertThat(rsWorker.getObject("lastUpdateStateDate", LocalDateTime.class))
+                    .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+            assertThat(rsWorker.getString("container")).isNull();
+            assertThat(rsWorker.getString("stdOut")).isNull();
+            assertThat(rsWorker.getString("stdErr")).isNull();
+        }
+    }
+
+    @Test
+    @Order(3)
+    public void should_update_worker() throws SQLException {
+        // Given
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+        final Worker worker = mock(Worker.class);
+        doReturn(new WorkerId("id")).when(worker).workerId();
+        doReturn(WorkerStatus.RUNNING)
+                .when(worker).workerStatus();
+        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
+                .when(worker).lastUpdateStateDate();
+        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
+                .when(worker).createdAt();
+        final ContainerInformation containerInformation = mock(ContainerInformation.class);
+        doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();
+        final WorkerLog stdOut = mock(WorkerLog.class);
+        doReturn("stdOut").when(stdOut).log();
+        final WorkerLog stdErr = mock(WorkerLog.class);
+        doReturn("stdErr").when(stdErr).log();
+
+        // When
+        workerDockerEntityRepository.saveWorker(worker, containerInformation, stdOut, stdErr);
+
+        // Then
+        try (final Connection con = workerDataSource.getConnection();
+             final Statement stmt = con.createStatement();
+             final ResultSet rsWorker = stmt.executeQuery("SELECT * FROM WORKER")) {
+
+            rsWorker.next();
+            assertThat(rsWorker.getString("workerId")).isEqualTo("id");
+            assertThat(rsWorker.getString("script")).isEqualTo("print(\"hello world\")");
+            assertThat(Arrays.asList(rsWorker.getString("workerStatus"))).containsAnyOf("FINISHED", "RUNNING");
+            assertThat(rsWorker.getObject("lastUpdateStateDate", LocalDateTime.class))
+                    .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00));
+            assertThat(rsWorker.getObject("createdAt", LocalDateTime.class))
+                    .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00));
+            assertThat(rsWorker.getString("container")).isEqualTo("{\"hello\": \"world\"}");
+            assertThat(rsWorker.getString("stdOut")).isEqualTo("stdOut");
+            assertThat(rsWorker.getString("stdErr")).isEqualTo("stdErr");
+        }
+    }
+
+    @Test
+    @Order(4)
+    public void should_list_all_workers() {
+        // Given
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+
+        // When
+        final List<? extends Worker> workers = workerDockerEntityRepository.listAllWorkers();
+
+        // Then
+        assertThat(workers).hasSize(1);
+        assertThat(workers.get(0)).isEqualTo(new WorkerDockerEntity(new WorkerId("id"),
+                WorkerStatus.CREATING,
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)));
+    }
+
+    @Test
+    @Order(5)
+    public void should_get_worker() throws Exception {
+        // Given
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+
+        // When
+        final Worker worker = workerDockerEntityRepository.getWorker(new WorkerId("id"));
+
+        // Then
+        assertThat(worker).isEqualTo(new WorkerDockerEntity(new WorkerId("id"),
+                WorkerStatus.CREATING,
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)));
+    }
+
+    @Test
+    @Order(6)
+    public void should_get_worker_throw_exception_when_worker_does_not_exist() {
+        // Given
+
+        // When && Then
+        assertThatCode(() -> {
+            workerDockerEntityRepository.getWorker(new WorkerId("id"));
+        })
+                .isInstanceOf(UnknownWorkerException.class)
+                .hasFieldOrPropertyWithValue("unknownWorkerId", new WorkerId("id"));
+    }
+
+    @Test
+    @Order(7)
+    public void should_get_std_out() throws Exception {
+        // Given
+        givenWorkerLog();
+
+        // When
+        final WorkerLog workerLog = workerDockerEntityRepository.getStdOut(new WorkerId("id"));
+
+        // Then
+        assertThat(workerLog).isEqualTo(new WorkerLogDockerEntity(new WorkerId("id"), "stdOut", Boolean.FALSE));
+    }
+
+    @Test
+    @Order(8)
+    public void should_get_std_out_throw_exception_when_worker_does_not_exist() {
+        // Given
+
+        // When && Then
+        assertThatCode(() -> {
+            workerDockerEntityRepository.getStdOut(new WorkerId("id"));
+        })
+                .isInstanceOf(UnknownWorkerException.class)
+                .hasFieldOrPropertyWithValue("unknownWorkerId", new WorkerId("id"));
+    }
+
+    @Test
+    @Order(9)
+    public void should_get_std_err() throws Exception {
+        // Given
+        givenWorkerLog();
+
+        // When
+        final WorkerLog workerLog = workerDockerEntityRepository.getStdErr(new WorkerId("id"));
+
+        // Then
+        assertThat(workerLog).isEqualTo(new WorkerLogDockerEntity(new WorkerId("id"), "stdErr", Boolean.FALSE));
+    }
+
+    @Test
+    @Order(10)
+    public void should_get_std_err_throw_exception_when_worker_does_not_exist() {
+        // Given
+
+        // When && Then
+        assertThatCode(() -> {
+            workerDockerEntityRepository.getStdErr(new WorkerId("id"));
+        })
+                .isInstanceOf(UnknownWorkerException.class)
+                .hasFieldOrPropertyWithValue("unknownWorkerId", new WorkerId("id"));
+    }
+
+    private void givenWorkerLog() {
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+        final Worker worker = mock(Worker.class);
+        doReturn(new WorkerId("id")).when(worker).workerId();
+        doReturn(WorkerStatus.RUNNING)
+                .when(worker).workerStatus();
+        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
+                .when(worker).lastUpdateStateDate();
+        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
+                .when(worker).createdAt();
+        final ContainerInformation containerInformation = mock(ContainerInformation.class);
+        doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();
+        final WorkerLog stdOut = mock(WorkerLog.class);
+        doReturn("stdOut").when(stdOut).log();
+        final WorkerLog stdErr = mock(WorkerLog.class);
+        doReturn("stdErr").when(stdErr).log();
+        workerDockerEntityRepository.saveWorker(worker, containerInformation, stdOut, stdErr);
+    }
+}
