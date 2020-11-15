@@ -1,10 +1,6 @@
 package com.tank.soar.worker_orchestrator.e2e;
 
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.core.DefaultDockerClientConfig;
-import com.github.dockerjava.core.DockerClientBuilder;
-import com.github.dockerjava.core.DockerClientConfig;
-import com.github.dockerjava.okhttp.OkDockerHttpClient;
 import com.tank.soar.worker_orchestrator.e2e.resources.EndToEndTestResource;
 import io.agroal.api.AgroalDataSource;
 import io.agroal.api.configuration.supplier.AgroalPropertiesReader;
@@ -17,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.DockerClientFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -71,18 +68,9 @@ public class EndToEndTest {
     static final DockerClient dockerClient;
 
     static {
-        final String url = String.format("tcp://%s:%d", "localhost", 2375);
-        final DockerClientConfig dockerClientConfig = DefaultDockerClientConfig
-                .createDefaultConfigBuilder()
-                .withDockerHost(url)
-                .withDockerTlsVerify(false)
-                .build();
-        dockerClient = DockerClientBuilder
-                .getInstance(dockerClientConfig)
-                .withDockerHttpClient(new OkDockerHttpClient.Builder()
-                        .dockerHost(dockerClientConfig.getDockerHost())
-                        .build())
-                .build();
+        dockerClient = DockerClientFactory
+                .instance()
+                .client();
     }
 
     @AfterEach
