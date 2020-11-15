@@ -1,10 +1,11 @@
 package com.tank.soar.worker_orchestrator.domain;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface WorkerRepository {
 
-    Worker createWorker(Worker worker, String script, ContainerInformation containerInformation, WorkerLog stdOut, WorkerLog stdErr);
+    WorkerId createWorker(WorkerId workerId, String script, LocalDateTime createdAt, LocalDateTime lastUpdateStateDate);
 
     Worker saveWorker(Worker worker, ContainerInformation containerInformation, WorkerLog stdOut, WorkerLog stdErr);
 

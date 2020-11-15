@@ -5,7 +5,7 @@ import java.util.Optional;
 
 public interface WorkerContainerManager {
 
-    Worker runScript(String script) throws UnableToRunScriptException;
+    Worker runScript(WorkerId workerId, String script) throws UnableToRunScriptException;
 
     List<? extends Worker> listAllContainers();
 

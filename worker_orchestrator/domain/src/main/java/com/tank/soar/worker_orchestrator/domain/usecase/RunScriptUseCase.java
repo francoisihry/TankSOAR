@@ -1,8 +1,9 @@
 package com.tank.soar.worker_orchestrator.domain.usecase;
 
 import com.tank.soar.worker_orchestrator.domain.*;
-import org.apache.commons.lang3.Validate;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Objects;
 
 public final class RunScriptUseCase implements UseCase<RunScriptCommand, Worker> {
@@ -10,31 +11,30 @@ public final class RunScriptUseCase implements UseCase<RunScriptCommand, Worker>
     private final WorkerContainerManager workerContainerManager;
     private final WorkerRepository workerRepository;
     private final TransactionalUseCase transactionalUseCase;
+    private final WorkerIdProvider workerIdProvider;
 
     public RunScriptUseCase(final WorkerContainerManager workerContainerManager,
                             final WorkerRepository workerRepository,
-                            final TransactionalUseCase transactionalUseCase) {
+                            final TransactionalUseCase transactionalUseCase,
+                            final WorkerIdProvider workerIdProvider) {
         this.workerContainerManager = Objects.requireNonNull(workerContainerManager);
         this.workerRepository = Objects.requireNonNull(workerRepository);
         this.transactionalUseCase = Objects.requireNonNull(transactionalUseCase);
+        this.workerIdProvider = Objects.requireNonNull(workerIdProvider);
     }
 
     @Override
     public Worker execute(final RunScriptCommand command) throws UnableToRunScriptUseCaseException {
         try {
-            final Worker worker = this.workerContainerManager.runScript(command.script());
-            final ContainerInformation containerMetadata = workerContainerManager.getContainerMetadata(worker.workerId());
-            final WorkerLog stdOut = workerContainerManager.getStdOut(worker.workerId()).get();
-            final WorkerLog stdErr = workerContainerManager.getStdErr(worker.workerId()).get();
-            Validate.validState(stdOut.workerId().equals(worker.workerId()));
-            Validate.validState(stdOut.hasFinishedProducingLog().equals(worker.hasFinished()));
-            Validate.validState(stdErr.workerId().equals(worker.workerId()));
-            Validate.validState(stdErr.hasFinishedProducingLog().equals(worker.hasFinished()));
+            final WorkerId workerId = this.workerIdProvider.provideNewWorkerId();
             this.transactionalUseCase.begin();
-            this.workerRepository.createWorker(worker, command.script(), containerMetadata, stdOut, stdErr);
+            this.workerRepository.createWorker(workerId, command.script(),
+                    LocalDateTime.now(ZoneOffset.UTC), // should use a provider - ie an interface and implementation : better testing
+                    LocalDateTime.now(ZoneOffset.UTC)); // should use a provider - ie an interface and implementation : better testing
             this.transactionalUseCase.commit();
-            return worker;
-        } catch (final UnableToRunScriptException | UnknownWorkerException e) {
+            return this.workerContainerManager.runScript(workerId, command.script());
+        } catch (final UnableToRunScriptException e) {
+            // FIXME
             throw new UnableToRunScriptUseCaseException(e);
         }
     }
