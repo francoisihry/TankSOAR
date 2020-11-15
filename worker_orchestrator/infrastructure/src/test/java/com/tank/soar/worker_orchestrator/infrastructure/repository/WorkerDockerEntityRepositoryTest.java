@@ -256,4 +256,30 @@ public class WorkerDockerEntityRepositoryTest {
         doReturn("stdErr").when(stdErr).log();
         workerDockerEntityRepository.saveWorker(worker, containerInformation, stdOut, stdErr);
     }
+
+    @Test
+    @Order(11)
+    public void should_has_worker_return_true_when_the_worker_is_present() {
+        // Given
+        givenWorkerLog();
+
+        // When
+        final boolean hasWorker = workerDockerEntityRepository.hasWorker(new WorkerId("id"));
+
+        // Then
+        assertThat(hasWorker).isTrue();
+    }
+
+    @Test
+    @Order(12)
+    public void should_has_worker_return_false_when_the_worker_is_not_present() {
+        // Given
+
+        // When
+        final boolean hasWorker = workerDockerEntityRepository.hasWorker(new WorkerId("id"));
+
+        // Then
+        assertThat(hasWorker).isFalse();
+    }
+
 }

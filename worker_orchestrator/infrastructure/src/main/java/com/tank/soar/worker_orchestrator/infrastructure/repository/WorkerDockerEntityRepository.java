@@ -19,6 +19,8 @@ import java.util.Objects;
 @ApplicationScoped
 public class WorkerDockerEntityRepository implements WorkerRepository {
 
+    private static final String HAS_WORKER = "SELECT EXISTS(SELECT 1 FROM WORKER WHERE workerId = ?)";
+
     private static final String CREATE_WORKER = "INSERT INTO WORKER (workerId, script, workerStatus, createdAt, lastUpdateStateDate) " +
             "VALUES (?, ?, ?, ?, ?)";
 
@@ -71,6 +73,19 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
             final int updated = saveWorkerPreparedStatement.executeUpdate();
             Validate.validState(updated == 1);
             return worker;
+        } catch (final SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public Boolean hasWorker(final WorkerId workerId) {
+        try (final Connection connection = workerDataSource.getConnection();
+             final PreparedStatement hasWorkerPreparedStatement = connection.prepareStatement(HAS_WORKER)) {
+            hasWorkerPreparedStatement.setString(1, workerId.id());
+            final ResultSet resultSet = hasWorkerPreparedStatement.executeQuery();
+            resultSet.next();
+            return resultSet.getBoolean(1);
         } catch (final SQLException e) {
             throw new RuntimeException(e);
         }

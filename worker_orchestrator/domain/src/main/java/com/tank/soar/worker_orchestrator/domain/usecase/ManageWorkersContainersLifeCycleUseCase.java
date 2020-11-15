@@ -29,6 +29,16 @@ public class ManageWorkersContainersLifeCycleUseCase implements UseCase<VoidComm
     public Void execute(final VoidCommand command) {
         final List<? extends Worker> workerContainers = workerContainerManager.listAllContainers();
         workerContainers.stream()
+                .filter(workerContainer -> {
+                    transactionalUseCase.begin();
+                    final boolean hasWorker = workerRepository.hasWorker(workerContainer.workerId());
+                    transactionalUseCase.commit();
+                    if (!hasWorker) {
+                        LOGGER.warn(String.format("A worker container is present but not the one in database '%s'. The worker container will not be removed.", workerContainer.workerId().id()));
+                        return false;
+                    }
+                    return true;
+                })
                 .peek(worker -> {
                     try {
                         final ContainerInformation containerMetadata = workerContainerManager.getContainerMetadata(worker.workerId());

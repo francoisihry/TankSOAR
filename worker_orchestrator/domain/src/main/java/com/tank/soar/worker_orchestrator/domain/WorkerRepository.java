@@ -9,6 +9,8 @@ public interface WorkerRepository {
 
     Worker saveWorker(Worker worker, ContainerInformation containerInformation, WorkerLog stdOut, WorkerLog stdErr);
 
+    Boolean hasWorker(WorkerId workerId);
+
     List<? extends Worker> listAllWorkers();
 
     Worker getWorker(WorkerId workerId) throws UnknownWorkerException;
