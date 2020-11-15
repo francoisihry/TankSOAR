@@ -58,6 +58,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
             pythonImageId = buildImageResultCallback.awaitImageId();
             LOGGER.info("End building image python");
         }
+        LOGGER.info("End image initialization");
     }
 
     @Override
