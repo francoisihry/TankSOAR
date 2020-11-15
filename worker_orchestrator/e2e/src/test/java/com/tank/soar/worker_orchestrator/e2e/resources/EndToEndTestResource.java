@@ -29,6 +29,9 @@ public class EndToEndTestResource implements QuarkusTestResourceLifecycleManager
                 .withUsername("postgres")
                 .withPassword("postgres");
         postgresWorkersContainer.start();
+        System.setProperty("quarkus.datasource.workers.jdbc.url", postgresWorkersContainer.getJdbcUrl());
+        System.setProperty("quarkus.datasource.workers.username", "postgres");
+        System.setProperty("quarkus.datasource.workers.password", "postgres");
         /**
          * To be able to access the docker tcp localhost I need to run the container with the 'host' network.
          * In this case no mapping port. The port 8080 will stay fix (8080) on the host.
@@ -54,6 +57,9 @@ public class EndToEndTestResource implements QuarkusTestResourceLifecycleManager
 
     @Override
     public void stop() {
+        System.clearProperty("quarkus.datasource.workers.jdbc.url");
+        System.clearProperty("quarkus.datasource.workers.username");
+        System.clearProperty("quarkus.datasource.workers.password");
         System.clearProperty("tanksoar.worker_orchestrator.http.port");
         if (workerOrchestratorContainer != null) {
             workerOrchestratorContainer.close();
