@@ -89,12 +89,12 @@ public enum DockerContainerStatus {
 
     public abstract WorkerStatus toWorkerStatus();
 
-    public static final DockerContainerStatus fromDockerStatus(final String containerStatus) {
+    public static final DockerContainerStatus fromDockerStatus(final String dockerStatus) {
         return Arrays.asList(DockerContainerStatus.values())
                 .stream()
-                .filter(dockerContainerStatusValue -> containerStatus.equals(dockerContainerStatusValue.dockerStatus()))
+                .filter(dockerContainerStatusValue -> dockerStatus.equals(dockerContainerStatusValue.dockerStatus()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException(String.format("Unsupported docker status '%s'", containerStatus)));
+                .orElseThrow(() -> new IllegalStateException(String.format("Unsupported docker status '%s'", dockerStatus)));
     }
 
 }
