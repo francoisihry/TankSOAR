@@ -11,7 +11,7 @@ public class DockerCompatibleUUIDNameWorkerIdProvider implements WorkerIdProvide
 
     @Override
     public WorkerId provideNewWorkerId() {
-        return new WorkerId(UUID.randomUUID().toString().replaceAll("\\-", "_"));
+        return new WorkerId(UUID.randomUUID().toString());
     }
 
 }

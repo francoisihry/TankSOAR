@@ -23,7 +23,7 @@ public class DockerCompatibleUUIDNameWorkerIdProviderTest {
         final WorkerId workerId = dockerCompatibleUuidNameWorkerIdProvider.provideNewWorkerId();
 
         // Then
-        assertThat(workerId.id()).matches("[0-9a-f]{8}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{4}_[0-9a-f]{12}");
+        assertThat(workerId.id()).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     }
 
 }
