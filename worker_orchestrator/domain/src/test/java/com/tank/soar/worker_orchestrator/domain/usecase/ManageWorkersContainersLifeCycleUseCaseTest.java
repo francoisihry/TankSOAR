@@ -35,6 +35,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         stdErr = mock(WorkerLog.class);
         doReturn(Optional.of(stdErr)).when(workerContainerManager).getStdErr(new WorkerId("id"));
         doReturn(new WorkerId("id")).when(stdErr).workerId();
+        doReturn(true).when(workerRepository).hasWorker(new WorkerId("id"));
     }
 
     @Test
@@ -51,6 +52,9 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
+        inOrder.verify(transactionalUseCase).begin();
+        inOrder.verify(workerRepository).hasWorker(new WorkerId("id"));
+        inOrder.verify(transactionalUseCase).commit();
         inOrder.verify(transactionalUseCase).begin();
         inOrder.verify(workerRepository).saveWorker(worker, containerInformation, stdOut, stdErr);
         inOrder.verify(transactionalUseCase).commit();
