@@ -45,5 +45,30 @@ services:
       - "./tank_frontend:/app"
     env_file:
       - ./tank_frontend/conf.env
+  worker_orchestrator_db:
+    image: postgres:11-alpine
+    environment:
+      - POSTGRES_DB=worker
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+    - "5433:5432"
+  worker_orchestrator:
+    image: tanksoar/worker_orchestrator:latest
+    environment:
+      - JAVA_OPTIONS=-Dquarkus.http.host=0.0.0.0
+        -Dquarkus.http.port=8080
+        -Djava.util.logging.manager=org.jboss.logmanager.LogManager
+        -Xmx128m
+        -Ddocker.daemon.tcp.host=localhost
+        -Ddocker.daemon.tcp.port=2375
+        -Dquarkus.datasource.workers.jdbc.url=jdbc:postgresql://localhost:5433/worker
+        -Dquarkus.datasource.workers.username=postgres
+        -Dquarkus.datasource.workers.password=postgres
+    ports:
+      - "127.0.0.1:8000:8000"
+    network_mode: "host"
+    depends_on:
+      - "worker_orchestrator_db"
 volumes:
   db:
