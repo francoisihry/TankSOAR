@@ -13,11 +13,15 @@ public final class WorkerDTO {
     private final String workerId;
     private final WorkerStatus workerStatus;
     private final LocalDateTime lastUpdateStateDate;
+    private final LocalDateTime createdAt;
+    private final Boolean hasFinished;
 
     public WorkerDTO(final Worker worker) {
         this.workerId = worker.workerId().id();
         this.workerStatus = worker.workerStatus();
         this.lastUpdateStateDate = worker.lastUpdateStateDate();
+        this.createdAt = worker.createdAt();
+        this.hasFinished = worker.hasFinished();
     }
 
     public String getWorkerId() {
@@ -32,6 +36,14 @@ public final class WorkerDTO {
         return lastUpdateStateDate;
     }
 
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public Boolean getHasFinished() {
+        return hasFinished;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -39,12 +51,14 @@ public final class WorkerDTO {
         WorkerDTO workerDTO = (WorkerDTO) o;
         return Objects.equals(workerId, workerDTO.workerId) &&
                 workerStatus == workerDTO.workerStatus &&
-                Objects.equals(lastUpdateStateDate, workerDTO.lastUpdateStateDate);
+                Objects.equals(lastUpdateStateDate, workerDTO.lastUpdateStateDate) &&
+                Objects.equals(createdAt, workerDTO.createdAt) &&
+                Objects.equals(hasFinished, workerDTO.hasFinished);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(workerId, workerStatus, lastUpdateStateDate);
+        return Objects.hash(workerId, workerStatus, lastUpdateStateDate, createdAt, hasFinished);
     }
 
     @Override
@@ -53,6 +67,8 @@ public final class WorkerDTO {
                 "workerId='" + workerId + '\'' +
                 ", workerStatus=" + workerStatus +
                 ", lastUpdateStateDate=" + lastUpdateStateDate +
+                ", createdAt=" + createdAt +
+                ", hasFinished=" + hasFinished +
                 '}';
     }
 }

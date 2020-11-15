@@ -8,6 +8,8 @@
   "examples": [
     [
       {
+        "createdAt": "2020-09-01T10:00:00",
+        "hasFinished": true,
         "lastUpdateStateDate": "2020-09-01T10:10:00",
         "workerId": "id",
         "workerStatus": "FINISHED"
@@ -26,17 +28,41 @@
         "default": {},
         "examples": [
           {
+            "createdAt": "2020-09-01T10:00:00",
+            "hasFinished": true,
             "lastUpdateStateDate": "2020-09-01T10:10:00",
             "workerId": "id",
             "workerStatus": "FINISHED"
           }
         ],
         "required": [
+          "createdAt",
+          "hasFinished",
           "lastUpdateStateDate",
           "workerId",
           "workerStatus"
         ],
         "properties": {
+          "createdAt": {
+            "$id": "#/items/anyOf/0/properties/createdAt",
+            "type": "string",
+            "title": "The createdAt schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": "",
+            "examples": [
+              "2020-09-01T10:00:00"
+            ]
+          },
+          "hasFinished": {
+            "$id": "#/items/anyOf/0/properties/hasFinished",
+            "type": "boolean",
+            "title": "The hasFinished schema",
+            "description": "An explanation about the purpose of this instance.",
+            "default": false,
+            "examples": [
+              true
+            ]
+          },
           "lastUpdateStateDate": {
             "$id": "#/items/anyOf/0/properties/lastUpdateStateDate",
             "type": "string",
@@ -68,7 +94,7 @@
             ]
           }
         },
-        "additionalProperties": true
+        "additionalProperties": false
       }
     ]
   }

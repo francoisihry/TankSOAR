@@ -55,7 +55,9 @@ public class WorkerEndpointTest {
                 .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/worker.json"))
                 .body("workerId", equalTo("id"))
                 .body("lastUpdateStateDate", equalTo("2020-09-01T10:10:00"))
-                .body("workerStatus", equalTo("FINISHED"));
+                .body("workerStatus", equalTo("FINISHED"))
+                .body("createdAt", equalTo("2020-09-01T10:00:00"))
+                .body("hasFinished", equalTo(Boolean.TRUE));
     }
 
     @Test
@@ -95,7 +97,9 @@ public class WorkerEndpointTest {
                 .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/workers.json"))
                 .body("[0].workerId", equalTo("id"))
                 .body("[0].lastUpdateStateDate", equalTo("2020-09-01T10:10:00"))
-                .body("[0].workerStatus", equalTo("FINISHED"));
+                .body("[0].workerStatus", equalTo("FINISHED"))
+                .body("[0].createdAt", equalTo("2020-09-01T10:00:00"))
+                .body("[0].hasFinished", equalTo(Boolean.TRUE));
     }
 
     @Test
@@ -195,7 +199,9 @@ public class WorkerEndpointTest {
                 .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/worker.json"))
                 .body("workerId", equalTo("id"))
                 .body("lastUpdateStateDate", equalTo("2020-09-01T10:10:00"))
-                .body("workerStatus", equalTo("FINISHED"));
+                .body("workerStatus", equalTo("FINISHED"))
+                .body("createdAt", equalTo("2020-09-01T10:00:00"))
+                .body("hasFinished", equalTo(Boolean.TRUE));
     }
 
     @Test
