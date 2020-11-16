@@ -12,10 +12,10 @@ import javax.enterprise.inject.Produces;
 public class DockerClientProducer {
 
     @ConfigProperty(name = "docker.daemon.tcp.host")
-    private String host;
+    String host;
 
     @ConfigProperty(name = "docker.daemon.tcp.port")
-    private Integer port;
+    Integer port;
 
     @ApplicationScoped
     @Produces

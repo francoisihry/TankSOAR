@@ -33,14 +33,14 @@ import static org.hamcrest.Matchers.equalTo;
 public class EndToEndTest {
 
     @ConfigProperty(name = "tanksoar.worker_orchestrator.http.port")
-    private Integer workerOrchestratorExposedHttpPort;
+    Integer workerOrchestratorExposedHttpPort;
 
     @ConfigProperty(name = "quarkus.datasource.workers.jdbc.url")
-    private String workersJdbcUrl;
+    String workersJdbcUrl;
     @ConfigProperty(name = "quarkus.datasource.workers.username")
-    private String workersUsername;
+    String workersUsername;
     @ConfigProperty(name = "quarkus.datasource.workers.password")
-    private String workersPassword;
+    String workersPassword;
 
     AgroalDataSource workerDataSource;
 
