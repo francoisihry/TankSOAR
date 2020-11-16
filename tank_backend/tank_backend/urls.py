@@ -22,7 +22,7 @@ urlpatterns = [
     path('api/login/', login_view, name='Login'),
     path('api/logout/', logout_view, name='Logout'),
 
-    path('openapi', get_schema_view(
+    path('api/openapi', get_schema_view(
             title="Tank",
             description="API using tank backend",
             version="0.0.1"

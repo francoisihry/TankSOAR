@@ -1,6 +1,7 @@
 import React, {useContext, useEffect} from "react";
 import {useDispatch, useSelector} from "react-redux";
 import {loadSingleRunbook} from "../../../actions/runbookActions";
+import {updateRunbook} from "../../../actions/runbookActions";
 import {getIconByLanguage} from "../../../styles/icon/languages";
 import AceEditor from "react-ace";
 import {ErrorResponseFromJson, TimestampToDate} from "../../../utils";
@@ -19,6 +20,7 @@ import {errorMsgStyle} from "../../../styles/error";
 import Editable from "../../Editable";
 import {css, cx} from "emotion";
 import CollapsibleSides from "../../collapsibleSides";
+import BackendInterface from "../../../services/BackendInterface";
 
 const Header = () => {
     return (
@@ -141,21 +143,19 @@ const Description = () => {
 
 
 const Output = () => {
+    const saveCtx = useContext(SaveContext)
+    const worker = useSelector(state => state.runbook.single.runbook.worker)
+
     return (
         <div>
             <h2 className='text-center'>Output</h2>
-            output... output... output... output... output... output... output... output... output...
+            stdout: {worker.stdout}
             <br/>
-            output... output... output... output... output... output... output... output... output... output...
-            output... output... output... output... output...
-            output... output... output... output... output... output... output... output... output... output...
-            output...
-            output... output... output... output... output... output... output... output... output... output...
-            output...
-            output... output... output... output... output... output... output... output... output... output...
-            output...
-            output... output... output... output... output... output... output... output... output... output...
-            output...
+            stderr: {worker.stdout}
+            <br/>
+            status: {worker.status}
+            <br/>
+
         </div>
     )
 }
@@ -172,7 +172,12 @@ const Index = (props) => {
     const ProgrammingInterface = () => {
         return (
             <div className='ml-4 mb-2'>
-                <Run className='ml-3'/>
+                <Run className='ml-3' onClick={()=> {
+                    console.log('running '+runbook.name);
+                    BackendInterface.executeRunbook(runbook.name).then(
+                        dispatch(loadSingleRunbook(runbook.name))
+                    )
+                }}/>
                 <Debug className='ml-3'/>
                 <Stop className='ml-3'/>
                 <Undo className='ml-3'/>

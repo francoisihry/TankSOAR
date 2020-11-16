@@ -144,6 +144,19 @@ class BackendInterface {
         return axios.patch(RUNBOOKS_URL+name+'/', body, config)
     }
 
+    static executeRunbook(name) {
+        const config = {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }
+
+
+        return axios.get(RUNBOOKS_URL+name+'/run/', config)
+    }
+
+
+
     static deleteRunbook(runbook) {
         return axios.delete(RUNBOOKS_URL + runbook + '/')
     }

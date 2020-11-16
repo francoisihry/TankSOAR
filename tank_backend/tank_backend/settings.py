@@ -76,7 +76,7 @@ WSGI_APPLICATION = 'tank_backend.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
-
+#
 DATABASES = {
     "default": {
         "ENGINE": 'django.db.backends.postgresql',
@@ -87,6 +87,15 @@ DATABASES = {
         "PORT": os.environ.get("SQL_PORT"),
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': 'db.sqlite3',
+#     }
+# }
+
+
 
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
@@ -142,3 +151,6 @@ SESSION_COOKIE_AGE = 60*60*2 # 2hours
 
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = []
+
+CELERY_BROKER_URL = 'amqp://admin:mypass@broker:5672'
+# CELERY_RESULT_BACKEND = 'rpc://admin:mypass@broker:5672'
