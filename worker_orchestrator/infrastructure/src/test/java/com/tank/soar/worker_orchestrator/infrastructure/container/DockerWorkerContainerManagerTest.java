@@ -312,4 +312,20 @@ public class DockerWorkerContainerManagerTest {
         verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
     }
 
+    @Test
+    @Order(16)
+    public void should_not_wait_60_seconds_to_get_hello_from_std_out() throws Exception {
+        // Given
+
+        // When
+        dockerWorkerContainerManager.runScript(new WorkerId("id"), "import time; print('hello'); time.sleep(60); print('hello 2')");
+
+        // Then
+        await()
+                .atMost(10, TimeUnit.SECONDS)
+                .until(() -> !"".equals(dockerWorkerContainerManager.getStdOut(new WorkerId("id")).get().log()));
+        assertThat(dockerWorkerContainerManager.getStdOut(new WorkerId("id")).get().log())
+                .isEqualTo("hello\n");
+    }
+
 }
