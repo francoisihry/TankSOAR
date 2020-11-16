@@ -2,11 +2,14 @@ package com.tank.soar.worker_orchestrator.infrastructure.container;
 
 import com.github.dockerjava.api.DockerClient;
 import com.tank.soar.worker_orchestrator.domain.*;
+import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.mockito.InjectSpy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,9 +19,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.*;
 
 @QuarkusTest
 public class DockerWorkerContainerManagerTest {
@@ -26,7 +29,10 @@ public class DockerWorkerContainerManagerTest {
     @Inject
     DockerWorkerContainerManager dockerWorkerContainerManager;
 
-    @Inject
+    @InjectSpy
+    WorkerLockMechanism workerLockMechanism;
+
+    @InjectSpy
     DockerClient dockerClient;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DockerWorkerContainerManagerTest.class);
@@ -40,11 +46,13 @@ public class DockerWorkerContainerManagerTest {
                 .exec()
                 .stream()
                 .peek(container -> LOGGER.info(String.format("Need to remove container '%s'", container.getId())))
-                .forEach(container ->
-                    dockerClient.removeContainerCmd(container.getId())
-                            .withForce(true)
-                            .exec()
-                );
+                .forEach(container -> {
+                        try {
+                            dockerClient.removeContainerCmd(container.getId())
+                                    .withForce(true)
+                                    .exec();
+                        } catch (final Exception e) {}
+                });
     }
 
     @Test
@@ -233,6 +241,75 @@ public class DockerWorkerContainerManagerTest {
 
         // Then
         assertThat(workerLog.isPresent()).isFalse();
+    }
+
+    @Test
+    @Order(12)
+    public void should_run_script_use_locking_mechanism() throws Exception {
+        // Given
+        final InOrder inOrder = inOrder(workerLockMechanism, dockerClient);
+
+        // When
+        dockerWorkerContainerManager.runScript(new WorkerId("id"), "print(\"hello world\")");
+
+        // Then
+        inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
+        verify(dockerClient, times(1)).startContainerCmd(any());
+        inOrder.verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
+    }
+
+    @Test
+    @Order(13)
+    public void should_run_script_be_unlocked_when_exception_is_thrown() {
+        // Given
+        doThrow(new RuntimeException()).when(dockerClient).startContainerCmd(anyString());
+
+        // When
+        try {
+            dockerWorkerContainerManager.runScript(new WorkerId("id"), "print(\"hello world\")");
+            fail("should have failed !");
+        } catch (final Exception e) {
+
+        }
+
+        // Then
+        verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
+    }
+
+    @Test
+    @Order(14)
+    public void should_delete_container_use_locking_mechanism() throws Exception {
+        // Given
+        final InOrder inOrder = inOrder(workerLockMechanism, dockerClient);
+        dockerWorkerContainerManager.runScript(new WorkerId("id"), "import sys\nprint(\"bye bye world\", file=sys.stderr)");
+
+        // When
+        dockerWorkerContainerManager.deleteContainer(new WorkerId("id"));
+
+        // then
+        inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
+        verify(dockerClient, times(1)).removeContainerCmd(any());
+        inOrder.verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
+    }
+
+    @Test
+    @Order(15)
+    public void should_delete_container_unlocked_when_exception_is_thrown() throws Exception {
+        // Given
+        dockerWorkerContainerManager.runScript(new WorkerId("id"), "import sys\nprint(\"bye bye world\", file=sys.stderr)");
+        doThrow(new RuntimeException()).when(dockerClient).removeContainerCmd(anyString());
+        reset(workerLockMechanism);
+
+        // When
+        try {
+            dockerWorkerContainerManager.deleteContainer(new WorkerId("id"));
+            fail("should have failed !");
+        } catch (final Exception e) {
+
+        }
+
+        // Then
+        verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
     }
 
 }

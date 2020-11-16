@@ -1,28 +1,24 @@
 package com.tank.soar.worker_orchestrator.infrastructure.repository;
 
 import com.tank.soar.worker_orchestrator.domain.*;
+import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
 import io.quarkus.agroal.DataSource;
 import io.agroal.api.AgroalDataSource;
 import org.apache.commons.lang3.Validate;
 
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.inject.Any;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 @ApplicationScoped
 public class WorkerDockerEntityRepository implements WorkerRepository {
-
-    final Lock lock = new ReentrantLock();// TODO should use the workerId to avoid locking for everyone
-    // Remark: only works on a single jvm mode. If you want multiple instances of this application running: use Hazelcast
 
     private static final String HAS_WORKER = "SELECT EXISTS(SELECT 1 FROM WORKER WHERE workerId = ?)";
 
@@ -38,15 +34,18 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
     private static final String GET_STD_ERR = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, stdErr FROM WORKER WHERE workerId = ?";
 
     private final AgroalDataSource workerDataSource;
+    private final WorkerLockMechanism workerLockMechanism;
 
-    public WorkerDockerEntityRepository(@DataSource("workers") final AgroalDataSource workerDataSource) {
+    public WorkerDockerEntityRepository(@DataSource("workers") final AgroalDataSource workerDataSource,
+                                        @Any final WorkerLockMechanism workerLockMechanism) {
         this.workerDataSource = Objects.requireNonNull(workerDataSource);
+        this.workerLockMechanism = Objects.requireNonNull(workerLockMechanism);
     }
 
     @Override
     public WorkerId createWorker(final WorkerId workerId, final String script,
                                  final LocalDateTime createdAt, final LocalDateTime lastUpdateStateDate) {
-        lock.lock();
+        workerLockMechanism.lock(workerId);
         try (final Connection connection = workerDataSource.getConnection();
              final PreparedStatement createWorkerPreparedStatement = connection.prepareStatement(CREATE_WORKER)) {
             createWorkerPreparedStatement.setString(1, workerId.id());
@@ -60,7 +59,7 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
         } catch (final SQLException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            workerLockMechanism.unlock(workerId);
         }
     }
 
@@ -69,7 +68,8 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
                              final ContainerInformation containerInformation,
                              final WorkerLog stdOut,
                              final WorkerLog stdErr) {
-        lock.lock();
+        final WorkerId workerId = worker.workerId();
+        workerLockMechanism.lock(workerId);
         try (final Connection connection = workerDataSource.getConnection();
              final PreparedStatement saveWorkerPreparedStatement = connection.prepareStatement(UPDATE_WORKER)) {
             saveWorkerPreparedStatement.setString(1, worker.workerStatus().name());
@@ -78,14 +78,14 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
             saveWorkerPreparedStatement.setString(4, containerInformation.fullInformation());
             saveWorkerPreparedStatement.setString(5, stdOut.log());
             saveWorkerPreparedStatement.setString(6, stdErr.log());
-            saveWorkerPreparedStatement.setString(7, worker.workerId().id());
+            saveWorkerPreparedStatement.setString(7, workerId.id());
             final int updated = saveWorkerPreparedStatement.executeUpdate();
             Validate.validState(updated == 1);
             return worker;
         } catch (final SQLException e) {
             throw new RuntimeException(e);
         } finally {
-            lock.unlock();
+            workerLockMechanism.unlock(workerId);
         }
     }
 
