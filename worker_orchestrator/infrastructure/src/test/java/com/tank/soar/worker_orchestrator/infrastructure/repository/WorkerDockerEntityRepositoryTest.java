@@ -261,7 +261,9 @@ public class WorkerDockerEntityRepositoryTest {
     @Order(11)
     public void should_has_worker_return_true_when_the_worker_is_present() {
         // Given
-        givenWorkerLog();
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
 
         // When
         final boolean hasWorker = workerDockerEntityRepository.hasWorker(new WorkerId("id"));
