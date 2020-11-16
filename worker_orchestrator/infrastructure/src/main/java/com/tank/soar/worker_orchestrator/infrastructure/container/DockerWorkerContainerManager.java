@@ -7,12 +7,14 @@ import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Image;
 import com.tank.soar.worker_orchestrator.domain.*;
+import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.inject.Any;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -21,17 +23,12 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class DockerWorkerContainerManager implements WorkerContainerManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DockerWorkerContainerManager.class);
-
-    final Lock lock = new ReentrantLock();// TODO should use the workerId to avoid locking for everyone
-    // Remark: only works on a single jvm mode. If you want multiple instances of this application running: use Hazelcast
 
     public static final String WORKER_ID = "workerId";
     public static final String IMAGE_TYPE = "TankSOAR";
@@ -40,9 +37,12 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     private final DockerClient dockerClient;
 
     private final String pythonImageId;
+    private final WorkerLockMechanism workerLockMechanism;
 
-    public DockerWorkerContainerManager(final DockerClient dockerClient) throws URISyntaxException {
+    public DockerWorkerContainerManager(final DockerClient dockerClient,
+                                        @Any final WorkerLockMechanism workerLockMechanism) throws URISyntaxException {
         this.dockerClient = Objects.requireNonNull(dockerClient);
+        this.workerLockMechanism = Objects.requireNonNull(workerLockMechanism);
         // build the python image if not present
         final Optional<Image> pythonTankSOARDockerImage = dockerClient.listImagesCmd()
                 .withLabelFilter(Collections.singletonMap(IMAGE_TYPE, PYTHON_IMAGE_TYPE))
@@ -68,7 +68,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
 
     @Override
     public Worker runScript(final WorkerId workerId, final String script) throws UnableToRunScriptException {
-        lock.lock();
+        workerLockMechanism.lock(workerId);
         try {
             // create container
             final CreateContainerResponse workerContainer = dockerClient.createContainerCmd(pythonImageId)
@@ -118,7 +118,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
         } catch (final IOException ioException) {
             throw new UnableToRunScriptException(workerId, ioException);
         } finally {
-            lock.unlock();
+            workerLockMechanism.unlock(workerId);
         }
     }
 
@@ -161,13 +161,13 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     public void deleteContainer(final WorkerId workerId) throws UnknownWorkerException {
         inspectWorkerContainer(workerId)
                 .map(inspectContainerResponse -> {
-                    lock.lock();
+                    workerLockMechanism.lock(workerId);
                     try {
                         dockerClient.removeContainerCmd(inspectContainerResponse.getId())
                                 .withForce(true)
                                 .exec();
                     } finally {
-                        lock.unlock();
+                        workerLockMechanism.unlock(workerId);
                     }
                     return inspectContainerResponse;
                 })
@@ -178,7 +178,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     public Optional<WorkerLog> getStdOut(final WorkerId workerId) {
         return inspectWorkerContainer(workerId)
                 .map(inspectContainerResponse -> {
-                    lock.lock();
+                    workerLockMechanism.lock(workerId);
                     try {
                         final LoggingResultCallbackAdapter loggingResultCallbackAdapter = new LoggingResultCallbackAdapter();
                         dockerClient
@@ -204,7 +204,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     } finally {
-                        lock.unlock();
+                        workerLockMechanism.unlock(workerId);
                     }
                 });
     }
@@ -213,7 +213,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     public Optional<WorkerLog> getStdErr(final WorkerId workerId) {
         return inspectWorkerContainer(workerId)
                 .map(inspectContainerResponse -> {
-                    lock.lock();
+                    workerLockMechanism.lock(workerId);
                     try {
                         final LoggingResultCallbackAdapter loggingResultCallbackAdapter = new LoggingResultCallbackAdapter();
                         dockerClient
@@ -239,7 +239,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     } finally {
-                        lock.unlock();
+                        workerLockMechanism.unlock(workerId);
                     }
                 });
     }

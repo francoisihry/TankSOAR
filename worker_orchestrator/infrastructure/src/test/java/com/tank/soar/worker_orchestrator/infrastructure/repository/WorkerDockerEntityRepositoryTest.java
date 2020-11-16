@@ -1,15 +1,18 @@
 package com.tank.soar.worker_orchestrator.infrastructure.repository;
 
 import com.tank.soar.worker_orchestrator.domain.*;
+import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
 import com.tank.soar.worker_orchestrator.resources.PostgresqlTestResource;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.agroal.DataSource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.mockito.InjectSpy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 import javax.inject.Inject;
 import java.sql.Connection;
@@ -21,10 +24,8 @@ import java.time.Month;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @QuarkusTest
 @QuarkusTestResource(PostgresqlTestResource.class)
@@ -33,6 +34,9 @@ public class WorkerDockerEntityRepositoryTest {
     @Inject
     @DataSource("workers")
     AgroalDataSource workerDataSource;
+
+    @InjectSpy
+    WorkerLockMechanism workerLockMechanism;
 
     @Inject
     WorkerDockerEntityRepository workerDockerEntityRepository;
@@ -261,7 +265,9 @@ public class WorkerDockerEntityRepositoryTest {
     @Order(11)
     public void should_has_worker_return_true_when_the_worker_is_present() {
         // Given
-        givenWorkerLog();
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
 
         // When
         final boolean hasWorker = workerDockerEntityRepository.hasWorker(new WorkerId("id"));
@@ -280,6 +286,96 @@ public class WorkerDockerEntityRepositoryTest {
 
         // Then
         assertThat(hasWorker).isFalse();
+    }
+
+    @Test
+    @Order(13)
+    public void should_create_worker_use_locking_mechanism() {
+        // Given
+        final InOrder inOrder = inOrder(workerLockMechanism);
+
+        // When
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+
+        // Then
+        inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
+        // I do not know how to check that the query has been done between
+        inOrder.verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
+    }
+
+    @Test
+    @Order(14)
+    public void should_create_worker_be_unlocked_when_exception_is_thrown() {
+        // Given
+
+        // When
+        try {
+            workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                    LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                    null);
+            fail("should have failed !");
+        } catch (final Exception e) {
+
+        }
+
+        // Then
+        verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
+    }
+
+    @Test
+    @Order(15)
+    public void should_save_worker_use_locking_mechanism() {
+        // Given
+        final InOrder inOrder = inOrder(workerLockMechanism);
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+        final Worker worker = mock(Worker.class);
+        doReturn(new WorkerId("id")).when(worker).workerId();
+        doReturn(WorkerStatus.RUNNING)
+                .when(worker).workerStatus();
+        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
+                .when(worker).lastUpdateStateDate();
+        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
+                .when(worker).createdAt();
+        final ContainerInformation containerInformation = mock(ContainerInformation.class);
+        doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();
+        final WorkerLog stdOut = mock(WorkerLog.class);
+        doReturn("stdOut").when(stdOut).log();
+        final WorkerLog stdErr = mock(WorkerLog.class);
+        doReturn("stdErr").when(stdErr).log();
+
+        // When
+        workerDockerEntityRepository.saveWorker(worker, containerInformation, stdOut, stdErr);
+
+        // Then
+        inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
+        // I do not know how to check that the query has been done between
+        inOrder.verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
+    }
+
+    @Test
+    @Order(16)
+    public void should_save_worker_be_unlocked_when_exception_is_thrown() {
+        // Given
+        final Worker worker = mock(Worker.class);
+        doReturn(new WorkerId("id")).when(worker).workerId();
+        final ContainerInformation containerInformation = mock(ContainerInformation.class);
+        final WorkerLog stdOut = mock(WorkerLog.class);
+        final WorkerLog stdErr = mock(WorkerLog.class);
+
+        // When
+        try {
+            workerDockerEntityRepository.saveWorker(worker, containerInformation, stdOut, stdErr);
+            fail("should have failed !");
+        } catch (final Exception e) {
+
+        }
+
+        // Then
+        verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
     }
 
 }
