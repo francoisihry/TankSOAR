@@ -45,6 +45,30 @@ services:
       - "./tank_frontend:/app"
     env_file:
       - ./tank_frontend/conf.env
+
+  broker:
+    image: rabbitmq:latest
+    hostname: broker
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=mypass
+    ports:
+      - "5672:5672"
+
+  worker:
+    build: ./tank_backend
+    restart: "no"
+    command: celery -A tank_backend worker
+    volumes:
+      - .:/code
+    depends_on:
+      - broker
+      - backend
+      - db
+    env_file:
+      - ./tank_backend/conf.env
+      - ./db_conf.env
+
   worker_orchestrator_db:
     image: postgres:11-alpine
     environment:
@@ -70,5 +94,6 @@ services:
     network_mode: "host"
     depends_on:
       - "worker_orchestrator_db"
+
 volumes:
   db:

@@ -11,8 +11,20 @@ from .models import Runbook
 from .serializers import RunbookSerializer
 from access.tests import get_login_token
 
+import time
 
-class RunbookTestCase(TestCase):
+from .models import Worker
+from .serializers import WorkerSerializer
+
+
+class WorkerTestCase(TestCase):
+    def test_serializer(self):
+        wkr = Worker.objects.create(worker_id=42)
+        serialized_worker = WorkerSerializer(wkr)
+        self.assertEqual(serialized_worker.data['worker_id'], 42)
+
+
+class RunbookSerializerTestCase(TestCase):
     def test_runbook_instance(self):
         rb = Runbook(name='test', language='python', content="print('hello kaamelott')")
         rb.save()
@@ -182,7 +194,7 @@ class UrlsTestCase(TestCase):
         self.karadok.roles.set(list(Role.objects.filter(id=Role.DEVELOPER)))
         self.karadok.save()
 
-        # get the runbook with its id
+        # get the runbook with its name
         resp = self.client.get('/api/runbooks/test/', Cookie='csrftoken={}'.format(self.csrftoken))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data['content'], "print('hello kaamelott')")
@@ -242,3 +254,30 @@ class PermissionTestCase(TestCase):
                                 content_type="application/json",
                                 data=json.dumps(runbook_data))
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+
+
+# class RunTestCase(TestCase):
+#     def setUp(self):
+#         # create user karadok
+#         User = get_user_model()
+#         self.karadok = User.objects.create_user(username='karadok', password='tankSOAR2!!!')
+#         # set the dev role to karadok
+#         self.karadok.roles.set(list(Role.objects.filter(id=Role.DEVELOPER)))
+#         self.csrftoken = get_login_token(self, 'karadok', 'tankSOAR2!!!')
+#
+#
+#     def test_run_runbook(self):
+#         # create a runbook
+#         rb = Runbook.objects.create(name='test', language='python', content="print('on en a gros !!')")
+#         resp = self.client.get('/api/runbooks/test/', Cookie='csrftoken={}'.format(self.csrftoken))
+#         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+#         self.assertEqual(resp.data['content'], "print('on en a gros !!')")
+#
+#         run_request = self.client.get('/api/runbooks/test/run/', Cookie='csrftoken={}'.format(self.csrftoken))
+#         time.sleep(15)
+#         i=0
+
+
+

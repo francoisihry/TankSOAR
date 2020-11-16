@@ -15,6 +15,28 @@ class RunbookNameValidator(RegexValidator):
     code = 'invalid_runbook_name'
 
 
+class WorkerStatus(models.TextChoices):
+    READY = 'ready'
+    RUNNING = 'running'
+    FINISHED = 'finished'
+    ERROR = 'error'
+
+
+class Worker(models.Model):
+    worker_id = models.IntegerField(blank=True, null=True)
+    stdout = models.TextField(blank=True)
+    stderr = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=10,
+        choices=WorkerStatus.choices,
+        default=WorkerStatus.READY,
+    )
+
+    @classmethod
+    def get_new(cls):
+        return cls.objects.create().id
+
+
 class Runbook(models.Model):
     name = models.CharField(max_length=120,
                             validators=[RunbookNameValidator()],
@@ -27,11 +49,5 @@ class Runbook(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    worker = models.OneToOneField(Worker, on_delete=models.CASCADE, default=Worker.get_new)
 
-
-class Worker(models.Model):
-    id = models.IntegerField(primary_key=True)
-    runbook = models.ForeignKey(Runbook, on_delete=models.CASCADE, blank=False)
-    stdout = models.TextField(blank=True)
-    stderr = models.TextField(blank=True)
-    status = models.TextField(default=False)
