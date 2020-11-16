@@ -18,20 +18,17 @@ public class ListWorkersUseCase implements UseCase<ListWorkersCommand, List<Work
     // priorité sur le container vs database ...
     private final WorkerContainerManager workerContainerManager;
     private final WorkerRepository workerRepository;
-    private final TransactionalUseCase transactionalUseCase;
 
     public ListWorkersUseCase(final WorkerContainerManager workerContainerManager,
-                              final WorkerRepository workerRepository,
-                              final TransactionalUseCase transactionalUseCase) {
+                              final WorkerRepository workerRepository) {
         this.workerContainerManager = Objects.requireNonNull(workerContainerManager);
         this.workerRepository = Objects.requireNonNull(workerRepository);
-        this.transactionalUseCase = Objects.requireNonNull(transactionalUseCase);
     }
 
     @Override
-    public List<Worker> execute(final ListWorkersCommand command) throws UseCaseException {
-        final List<Worker> workersContainers = workerContainerManager.listAllContainers();
-        final List<Worker> workersDatabases = workerRepository.listAllWorkers();
+    public List<Worker> execute(final ListWorkersCommand command) {
+        final List<? extends Worker> workersContainers = workerContainerManager.listAllContainers();
+        final List<? extends Worker> workersDatabases = workerRepository.listAllWorkers();
         final Map<WorkerId, List<Worker>> workersByWorkerIds = Stream.concat(
                 workersContainers.stream(), workersDatabases.stream())
                 .collect(Collectors.groupingBy(Worker::workerId));

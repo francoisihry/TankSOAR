@@ -1,21 +1,22 @@
 package com.tank.soar.worker_orchestrator.domain;
 
 import java.util.List;
+import java.util.Optional;
 
-public interface WorkerContainerManager<INFRA extends ContainerMetadata> {
+public interface WorkerContainerManager {
 
-    Worker runScript(String script) throws UnableToRunScriptException;
+    Worker runScript(WorkerId workerId, String script) throws UnableToRunScriptException;
 
-    List<Worker> listAllContainers();
+    List<? extends Worker> listAllContainers();
 
-    Worker getContainer(WorkerId workerId) throws UnknownWorkerException;
+    Optional<Worker> findContainer(WorkerId workerId);
 
-    INFRA getContainerMetadata(WorkerId workerId) throws UnknownWorkerException;
+    ContainerInformation getContainerMetadata(WorkerId workerId) throws UnknownWorkerException;
 
-    void removeContainer(WorkerId workerId) throws UnknownWorkerException;
+    void deleteContainer(WorkerId workerId) throws UnknownWorkerException;
 
-    String getStdOut(WorkerId workerId) throws UnknownWorkerException;
+    Optional<WorkerLog> getStdOut(WorkerId workerId);
 
-    String getStdErr(WorkerId workerId) throws UnknownWorkerException;
+    Optional<WorkerLog> getStdErr(WorkerId workerId);
 
 }

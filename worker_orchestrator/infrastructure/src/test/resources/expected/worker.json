@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "http://example.com/example.json",
+  "type": "object",
+  "title": "The root schema",
+  "description": "The root schema comprises the entire JSON document.",
+  "default": {},
+  "examples": [
+    {
+      "createdAt": "2020-09-01T10:00:00",
+      "hasFinished": true,
+      "lastUpdateStateDate": "2020-09-01T10:10:00",
+      "workerId": "id",
+      "workerStatus": "FINISHED"
+    }
+  ],
+  "required": [
+    "createdAt",
+    "hasFinished",
+    "lastUpdateStateDate",
+    "workerId",
+    "workerStatus"
+  ],
+  "properties": {
+    "createdAt": {
+      "$id": "#/properties/createdAt",
+      "type": "string",
+      "title": "The createdAt schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "2020-09-01T10:00:00"
+      ]
+    },
+    "hasFinished": {
+      "$id": "#/properties/hasFinished",
+      "type": "boolean",
+      "title": "The hasFinished schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": false,
+      "examples": [
+        true
+      ]
+    },
+    "lastUpdateStateDate": {
+      "$id": "#/properties/lastUpdateStateDate",
+      "type": "string",
+      "title": "The lastUpdateStateDate schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "2020-09-01T10:10:00"
+      ]
+    },
+    "workerId": {
+      "$id": "#/properties/workerId",
+      "type": "string",
+      "title": "The workerId schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "id"
+      ]
+    },
+    "workerStatus": {
+      "$id": "#/properties/workerStatus",
+      "type": "string",
+      "title": "The workerStatus schema",
+      "description": "An explanation about the purpose of this instance.",
+      "default": "",
+      "examples": [
+        "FINISHED"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

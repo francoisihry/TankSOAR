@@ -8,6 +8,7 @@ import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collections;
+import java.util.Optional;
 
 import static org.mockito.Mockito.*;
 
@@ -18,14 +19,21 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
 
     private WorkerContainerManager workerContainerManager;
     private WorkerRepository workerRepository;
-    private TransactionalUseCase transactionalUseCase;
+    private WorkerLog stdOut;
+    private WorkerLog stdErr;
 
     @BeforeEach
     public void setup() {
         workerContainerManager = mock(WorkerContainerManager.class);
         workerRepository = mock(WorkerRepository.class);
-        transactionalUseCase = mock(TransactionalUseCase.class);
-        manageWorkersContainersLifeCycleUseCase = new ManageWorkersContainersLifeCycleUseCase(workerContainerManager, workerRepository, transactionalUseCase);
+        manageWorkersContainersLifeCycleUseCase = new ManageWorkersContainersLifeCycleUseCase(workerContainerManager, workerRepository);
+        stdOut = mock(WorkerLog.class);
+        doReturn(Optional.of(stdOut)).when(workerContainerManager).getStdOut(new WorkerId("id"));
+        doReturn(new WorkerId("id")).when(stdOut).workerId();
+        stdErr = mock(WorkerLog.class);
+        doReturn(Optional.of(stdErr)).when(workerContainerManager).getStdErr(new WorkerId("id"));
+        doReturn(new WorkerId("id")).when(stdErr).workerId();
+        doReturn(true).when(workerRepository).hasWorker(new WorkerId("id"));
     }
 
     @Test
@@ -34,17 +42,16 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(Collections.singletonList(worker)).when(workerContainerManager).listAllContainers();
-        final ContainerMetadata containerMetadata = mock(ContainerMetadata.class);
-        doReturn(containerMetadata).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
-        final InOrder inOrder = inOrder(workerRepository, transactionalUseCase);
+        final ContainerInformation containerInformation = mock(ContainerInformation.class);
+        doReturn(containerInformation).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
+        final InOrder inOrder = inOrder(workerRepository);
 
         // When
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
-        inOrder.verify(transactionalUseCase).begin();
-        inOrder.verify(workerRepository).saveWorker(worker, containerMetadata);
-        inOrder.verify(transactionalUseCase).commit();
+        inOrder.verify(workerRepository).hasWorker(new WorkerId("id"));
+        inOrder.verify(workerRepository).saveWorker(worker, containerInformation, stdOut, stdErr);
     }
 
     @Test
@@ -53,6 +60,8 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.RUNNING).when(worker).workerStatus();
+        doReturn(Boolean.FALSE).when(stdOut).hasFinishedProducingLog();
+        doReturn(Boolean.FALSE).when(stdErr).hasFinishedProducingLog();
         when(worker.hasFinished()).thenCallRealMethod();
         doReturn(Collections.singletonList(worker)).when(workerContainerManager).listAllContainers();
 
@@ -60,7 +69,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
-        verify(workerContainerManager, times(0)).removeContainer(any());
+        verify(workerContainerManager, times(0)).deleteContainer(any());
     }
 
     @Test
@@ -69,6 +78,8 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.FINISHED).when(worker).workerStatus();
+        doReturn(Boolean.TRUE).when(stdOut).hasFinishedProducingLog();
+        doReturn(Boolean.TRUE).when(stdErr).hasFinishedProducingLog();
         when(worker.hasFinished()).thenCallRealMethod();
         doReturn(Collections.singletonList(worker)).when(workerContainerManager).listAllContainers();
 
@@ -76,7 +87,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
-        verify(workerContainerManager, times(1)).removeContainer(new WorkerId("id"));
+        verify(workerContainerManager, times(1)).deleteContainer(new WorkerId("id"));
     }
 
     @Test
@@ -85,6 +96,8 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.ERROR).when(worker).workerStatus();
+        doReturn(Boolean.TRUE).when(stdOut).hasFinishedProducingLog();
+        doReturn(Boolean.TRUE).when(stdErr).hasFinishedProducingLog();
         when(worker.hasFinished()).thenCallRealMethod();
         doReturn(Collections.singletonList(worker)).when(workerContainerManager).listAllContainers();
 
@@ -92,7 +105,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
-        verify(workerContainerManager, times(1)).removeContainer(new WorkerId("id"));
+        verify(workerContainerManager, times(1)).deleteContainer(new WorkerId("id"));
     }
 
 }

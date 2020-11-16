@@ -1,17 +1,22 @@
 package com.tank.soar.worker_orchestrator.domain;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
-public interface WorkerRepository<INFRA extends ContainerMetadata> {
+public interface WorkerRepository {
 
-    Worker saveWorker(Worker worker, INFRA containerMetadata);
+    WorkerId createWorker(WorkerId workerId, String script, LocalDateTime createdAt, LocalDateTime lastUpdateStateDate);
 
-    List<Worker> listAllWorkers();
+    Worker saveWorker(Worker worker, ContainerInformation containerInformation, WorkerLog stdOut, WorkerLog stdErr);
+
+    Boolean hasWorker(WorkerId workerId);
+
+    List<? extends Worker> listAllWorkers();
 
     Worker getWorker(WorkerId workerId) throws UnknownWorkerException;
 
-    String getStdOut(WorkerId workerId) throws UnknownWorkerException;
+    WorkerLog getStdOut(WorkerId workerId) throws UnknownWorkerException;
 
-    String getStdErr(WorkerId workerId) throws UnknownWorkerException;
+    WorkerLog getStdErr(WorkerId workerId) throws UnknownWorkerException;
 
 }

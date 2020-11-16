@@ -13,8 +13,11 @@ public interface Worker {
 
     LocalDateTime lastUpdateStateDate();
 
+    LocalDateTime createdAt();
+
     default boolean hasFinished() {
-        return Arrays.asList(WorkerStatus.FINISHED, WorkerStatus.ERROR)
+        // TODO je devrais rajouter un test parametrée ...
+        return Arrays.asList(WorkerStatus.ERROR_CREATING, WorkerStatus.FINISHED, WorkerStatus.ERROR)
                 .contains(workerStatus());
     }
 

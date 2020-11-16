@@ -4,35 +4,46 @@ import com.tank.soar.worker_orchestrator.domain.*;
 
 import java.util.List;
 import java.util.Objects;
+
+import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ManageWorkersContainersLifeCycleUseCase<INFRA extends ContainerMetadata> implements UseCase<VoidCommand, Void> {
+public class ManageWorkersContainersLifeCycleUseCase implements UseCase<VoidCommand, Void> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ManageWorkersContainersLifeCycleUseCase.class);
 
-    private final WorkerContainerManager<INFRA> workerContainerManager;
-    private final WorkerRepository<INFRA> workerRepository;
-    private final TransactionalUseCase transactionalUseCase;
+    private final WorkerContainerManager workerContainerManager;
+    private final WorkerRepository workerRepository;
 
-    public ManageWorkersContainersLifeCycleUseCase(final WorkerContainerManager<INFRA> workerContainerManager,
-                                                   final WorkerRepository<INFRA> workerRepository,
-                                                   final TransactionalUseCase transactionalUseCase) {
+    public ManageWorkersContainersLifeCycleUseCase(final WorkerContainerManager workerContainerManager,
+                                                   final WorkerRepository workerRepository) {
         this.workerContainerManager = Objects.requireNonNull(workerContainerManager);
         this.workerRepository = Objects.requireNonNull(workerRepository);
-        this.transactionalUseCase = Objects.requireNonNull(transactionalUseCase);
     }
 
     @Override
-    public Void execute(final VoidCommand command) throws UseCaseException {
-        final List<Worker> workerContainers = workerContainerManager.listAllContainers();
+    public Void execute(final VoidCommand command) {
+        final List<? extends Worker> workerContainers = workerContainerManager.listAllContainers();
         workerContainers.stream()
+                .filter(workerContainer -> {
+                    final boolean hasWorker = workerRepository.hasWorker(workerContainer.workerId());
+                    if (!hasWorker) {
+                        LOGGER.warn(String.format("A worker container is present but not the one in database '%s'. The worker container will not be removed.", workerContainer.workerId().id()));
+                        return false;
+                    }
+                    return true;
+                })
                 .peek(worker -> {
                     try {
-                        final INFRA containerMetadata = workerContainerManager.getContainerMetadata(worker.workerId());
-                        transactionalUseCase.begin();
-                        workerRepository.saveWorker(worker, containerMetadata);
-                        transactionalUseCase.commit();
+                        final ContainerInformation containerMetadata = workerContainerManager.getContainerMetadata(worker.workerId());
+                        final WorkerLog stdOut = workerContainerManager.getStdOut(worker.workerId()).get();
+                        final WorkerLog stdErr = workerContainerManager.getStdErr(worker.workerId()).get();
+                        Validate.validState(stdOut.workerId().equals(worker.workerId()));
+                        Validate.validState(stdOut.hasFinishedProducingLog().equals(worker.hasFinished()));
+                        Validate.validState(stdErr.workerId().equals(worker.workerId()));
+                        Validate.validState(stdErr.hasFinishedProducingLog().equals(worker.hasFinished()));
+                        workerRepository.saveWorker(worker, containerMetadata, stdOut, stdErr);
                         LOGGER.info(String.format("Container state workerId '%s' saved", worker.workerId().id()));
                     } catch (final UnknownWorkerException unknownWorkerException) {
                         LOGGER.warn(String.format("Unable to get container state '%s'", unknownWorkerException.unknownWorkerId()));
@@ -41,7 +52,7 @@ public class ManageWorkersContainersLifeCycleUseCase<INFRA extends ContainerMeta
                 .filter(Worker::hasFinished)
                 .forEach(finishedWorker -> {
                     try {
-                        workerContainerManager.removeContainer(finishedWorker.workerId());
+                        workerContainerManager.deleteContainer(finishedWorker.workerId());
                         LOGGER.info(String.format("Container workerId '%s' removed", finishedWorker.workerId().id()));
                     } catch (final UnknownWorkerException unknownWorkerException) {
                         LOGGER.warn(String.format("Unable to remove unknown container '%s'", unknownWorkerException.unknownWorkerId()));

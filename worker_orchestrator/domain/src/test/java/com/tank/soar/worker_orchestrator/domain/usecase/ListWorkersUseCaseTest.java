@@ -25,14 +25,12 @@ public class ListWorkersUseCaseTest {
 
     private WorkerContainerManager workerContainerManager;
     private WorkerRepository workerRepository;
-    private TransactionalUseCase transactionalUseCase;
 
     @BeforeEach
     public void setup() {
         workerContainerManager = mock(WorkerContainerManager.class);
         workerRepository = mock(WorkerRepository.class);
-        transactionalUseCase = mock(TransactionalUseCase.class);
-        listWorkersUseCase = new ListWorkersUseCase(workerContainerManager, workerRepository, transactionalUseCase);
+        listWorkersUseCase = new ListWorkersUseCase(workerContainerManager, workerRepository);
     }
 
     @Test
