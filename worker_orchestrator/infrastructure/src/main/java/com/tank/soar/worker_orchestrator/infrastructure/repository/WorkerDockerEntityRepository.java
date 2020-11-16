@@ -15,9 +15,14 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 @ApplicationScoped
 public class WorkerDockerEntityRepository implements WorkerRepository {
+
+    final Lock lock = new ReentrantLock();// TODO should use the workerId to avoid locking for everyone
+    // Remark: only works on a single jvm mode. If you want multiple instances of this application running: use Hazelcast
 
     private static final String HAS_WORKER = "SELECT EXISTS(SELECT 1 FROM WORKER WHERE workerId = ?)";
 
@@ -41,6 +46,7 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
     @Override
     public WorkerId createWorker(final WorkerId workerId, final String script,
                                  final LocalDateTime createdAt, final LocalDateTime lastUpdateStateDate) {
+        lock.lock();
         try (final Connection connection = workerDataSource.getConnection();
              final PreparedStatement createWorkerPreparedStatement = connection.prepareStatement(CREATE_WORKER)) {
             createWorkerPreparedStatement.setString(1, workerId.id());
@@ -53,6 +59,8 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
             return workerId;
         } catch (final SQLException e) {
             throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -61,6 +69,7 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
                              final ContainerInformation containerInformation,
                              final WorkerLog stdOut,
                              final WorkerLog stdErr) {
+        lock.lock();
         try (final Connection connection = workerDataSource.getConnection();
              final PreparedStatement saveWorkerPreparedStatement = connection.prepareStatement(UPDATE_WORKER)) {
             saveWorkerPreparedStatement.setString(1, worker.workerStatus().name());
@@ -75,6 +84,8 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
             return worker;
         } catch (final SQLException e) {
             throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
         }
     }
 

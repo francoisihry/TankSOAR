@@ -21,12 +21,17 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class DockerWorkerContainerManager implements WorkerContainerManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DockerWorkerContainerManager.class);
+
+    final Lock lock = new ReentrantLock();// TODO should use the workerId to avoid locking for everyone
+    // Remark: only works on a single jvm mode. If you want multiple instances of this application running: use Hazelcast
 
     public static final String WORKER_ID = "workerId";
     public static final String IMAGE_TYPE = "TankSOAR";
@@ -63,6 +68,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
 
     @Override
     public Worker runScript(final WorkerId workerId, final String script) throws UnableToRunScriptException {
+        lock.lock();
         try {
             // create container
             final CreateContainerResponse workerContainer = dockerClient.createContainerCmd(pythonImageId)
@@ -111,6 +117,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                     .build();
         } catch (final IOException ioException) {
             throw new UnableToRunScriptException(workerId, ioException);
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -153,9 +161,14 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     public void deleteContainer(final WorkerId workerId) throws UnknownWorkerException {
         inspectWorkerContainer(workerId)
                 .map(inspectContainerResponse -> {
-                    dockerClient.removeContainerCmd(inspectContainerResponse.getId())
-                            .withForce(true)
-                            .exec();
+                    lock.lock();
+                    try {
+                        dockerClient.removeContainerCmd(inspectContainerResponse.getId())
+                                .withForce(true)
+                                .exec();
+                    } finally {
+                        lock.unlock();
+                    }
                     return inspectContainerResponse;
                 })
                 .orElseThrow(() -> new UnknownWorkerException(workerId));
@@ -165,6 +178,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     public Optional<WorkerLog> getStdOut(final WorkerId workerId) {
         return inspectWorkerContainer(workerId)
                 .map(inspectContainerResponse -> {
+                    lock.lock();
                     try {
                         final LoggingResultCallbackAdapter loggingResultCallbackAdapter = new LoggingResultCallbackAdapter();
                         dockerClient
@@ -189,6 +203,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                         return new WorkerLogDockerContainer(workerDockerContainer, log);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
+                    } finally {
+                        lock.unlock();
                     }
                 });
     }
@@ -197,6 +213,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     public Optional<WorkerLog> getStdErr(final WorkerId workerId) {
         return inspectWorkerContainer(workerId)
                 .map(inspectContainerResponse -> {
+                    lock.lock();
                     try {
                         final LoggingResultCallbackAdapter loggingResultCallbackAdapter = new LoggingResultCallbackAdapter();
                         dockerClient
@@ -221,6 +238,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                         return new WorkerLogDockerContainer(workerDockerContainer, log);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
+                    } finally {
+                        lock.unlock();
                     }
                 });
     }
