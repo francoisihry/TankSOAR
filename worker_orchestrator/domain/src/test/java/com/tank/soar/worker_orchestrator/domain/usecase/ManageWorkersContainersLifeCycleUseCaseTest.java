@@ -19,7 +19,6 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
 
     private WorkerContainerManager workerContainerManager;
     private WorkerRepository workerRepository;
-    private TransactionalUseCase transactionalUseCase;
     private WorkerLog stdOut;
     private WorkerLog stdErr;
 
@@ -27,8 +26,7 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
     public void setup() {
         workerContainerManager = mock(WorkerContainerManager.class);
         workerRepository = mock(WorkerRepository.class);
-        transactionalUseCase = mock(TransactionalUseCase.class);
-        manageWorkersContainersLifeCycleUseCase = new ManageWorkersContainersLifeCycleUseCase(workerContainerManager, workerRepository, transactionalUseCase);
+        manageWorkersContainersLifeCycleUseCase = new ManageWorkersContainersLifeCycleUseCase(workerContainerManager, workerRepository);
         stdOut = mock(WorkerLog.class);
         doReturn(Optional.of(stdOut)).when(workerContainerManager).getStdOut(new WorkerId("id"));
         doReturn(new WorkerId("id")).when(stdOut).workerId();
@@ -46,18 +44,14 @@ public class ManageWorkersContainersLifeCycleUseCaseTest {
         doReturn(Collections.singletonList(worker)).when(workerContainerManager).listAllContainers();
         final ContainerInformation containerInformation = mock(ContainerInformation.class);
         doReturn(containerInformation).when(workerContainerManager).getContainerMetadata(new WorkerId("id"));
-        final InOrder inOrder = inOrder(workerRepository, transactionalUseCase);
+        final InOrder inOrder = inOrder(workerRepository);
 
         // When
         manageWorkersContainersLifeCycleUseCase.execute(new VoidCommand());
 
         // Then
-        inOrder.verify(transactionalUseCase).begin();
         inOrder.verify(workerRepository).hasWorker(new WorkerId("id"));
-        inOrder.verify(transactionalUseCase).commit();
-        inOrder.verify(transactionalUseCase).begin();
         inOrder.verify(workerRepository).saveWorker(worker, containerInformation, stdOut, stdErr);
-        inOrder.verify(transactionalUseCase).commit();
     }
 
     @Test

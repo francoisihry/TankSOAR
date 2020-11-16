@@ -17,17 +17,15 @@ public class RunScriptUseCaseTest {
 
     private WorkerContainerManager workerContainerManager;
     private WorkerRepository workerRepository;
-    private TransactionalUseCase transactionalUseCase;
     private WorkerIdProvider workerIdProvider;
 
     @BeforeEach
     public void setup() {
         workerContainerManager = mock(WorkerContainerManager.class);
         workerRepository = mock(WorkerRepository.class);
-        transactionalUseCase = mock(TransactionalUseCase.class);
         workerIdProvider = mock(WorkerIdProvider.class);
         doReturn(new WorkerId("id")).when(workerIdProvider).provideNewWorkerId();
-        runScriptUseCase = new RunScriptUseCase(workerContainerManager, workerRepository, transactionalUseCase, workerIdProvider);
+        runScriptUseCase = new RunScriptUseCase(workerContainerManager, workerRepository, workerIdProvider);
     }
 
     @Test
@@ -48,15 +46,13 @@ public class RunScriptUseCaseTest {
         // Given
         final Worker worker = mock(Worker.class);
         doReturn(worker).when(workerContainerManager).runScript(new WorkerId("id"),"script");
-        final InOrder inOrder = inOrder(workerRepository, transactionalUseCase);
+        final InOrder inOrder = inOrder(workerRepository);
 
         // When
         runScriptUseCase.execute(RunScriptCommand.newBuilder().withScript("script").build());
 
         // Then
-        inOrder.verify(transactionalUseCase).begin();
-        inOrder.verify(workerRepository).createWorker(eq(new WorkerId("id")), eq("script"), any(), any());
-        inOrder.verify(transactionalUseCase).commit();
+        verify(workerRepository, times(1)).createWorker(eq(new WorkerId("id")), eq("script"), any(), any());
     }
 
 }

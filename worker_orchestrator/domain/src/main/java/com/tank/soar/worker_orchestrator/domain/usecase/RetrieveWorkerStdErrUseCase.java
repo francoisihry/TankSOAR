@@ -8,14 +8,11 @@ public class RetrieveWorkerStdErrUseCase implements UseCase<RetrieveWorkerStdErr
 
     private final WorkerContainerManager workerContainerManager;
     private final WorkerRepository workerRepository;
-    private final TransactionalUseCase transactionalUseCase;
 
     public RetrieveWorkerStdErrUseCase(final WorkerContainerManager workerContainerManager,
-                                       final WorkerRepository workerRepository,
-                                       final TransactionalUseCase transactionalUseCase) {
+                                       final WorkerRepository workerRepository) {
         this.workerContainerManager = Objects.requireNonNull(workerContainerManager);
         this.workerRepository = Objects.requireNonNull(workerRepository);
-        this.transactionalUseCase = Objects.requireNonNull(transactionalUseCase);
     }
 
     @Override
@@ -25,12 +22,8 @@ public class RetrieveWorkerStdErrUseCase implements UseCase<RetrieveWorkerStdErr
                 .orElseGet(() -> {
                     // In this case it has been deleted because the container state is finished.
                     try {
-                        transactionalUseCase.begin();
-                        final WorkerLog stdErr = workerRepository.getStdErr(workerId);
-                        transactionalUseCase.commit();
-                        return stdErr;
+                        return workerRepository.getStdErr(workerId);
                     } catch (final UnknownWorkerException unknownWorkerException1) {
-                        transactionalUseCase.rollback();
                         throw new UnknownWorkerUseCaseException(unknownWorkerException1.unknownWorkerId());
                     }
                 });

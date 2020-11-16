@@ -15,14 +15,11 @@ public class ManageWorkersContainersLifeCycleUseCase implements UseCase<VoidComm
 
     private final WorkerContainerManager workerContainerManager;
     private final WorkerRepository workerRepository;
-    private final TransactionalUseCase transactionalUseCase;
 
     public ManageWorkersContainersLifeCycleUseCase(final WorkerContainerManager workerContainerManager,
-                                                   final WorkerRepository workerRepository,
-                                                   final TransactionalUseCase transactionalUseCase) {
+                                                   final WorkerRepository workerRepository) {
         this.workerContainerManager = Objects.requireNonNull(workerContainerManager);
         this.workerRepository = Objects.requireNonNull(workerRepository);
-        this.transactionalUseCase = Objects.requireNonNull(transactionalUseCase);
     }
 
     @Override
@@ -30,9 +27,7 @@ public class ManageWorkersContainersLifeCycleUseCase implements UseCase<VoidComm
         final List<? extends Worker> workerContainers = workerContainerManager.listAllContainers();
         workerContainers.stream()
                 .filter(workerContainer -> {
-                    transactionalUseCase.begin();
                     final boolean hasWorker = workerRepository.hasWorker(workerContainer.workerId());
-                    transactionalUseCase.commit();
                     if (!hasWorker) {
                         LOGGER.warn(String.format("A worker container is present but not the one in database '%s'. The worker container will not be removed.", workerContainer.workerId().id()));
                         return false;
@@ -48,9 +43,7 @@ public class ManageWorkersContainersLifeCycleUseCase implements UseCase<VoidComm
                         Validate.validState(stdOut.hasFinishedProducingLog().equals(worker.hasFinished()));
                         Validate.validState(stdErr.workerId().equals(worker.workerId()));
                         Validate.validState(stdErr.hasFinishedProducingLog().equals(worker.hasFinished()));
-                        transactionalUseCase.begin();
                         workerRepository.saveWorker(worker, containerMetadata, stdOut, stdErr);
-                        transactionalUseCase.commit();
                         LOGGER.info(String.format("Container state workerId '%s' saved", worker.workerId().id()));
                     } catch (final UnknownWorkerException unknownWorkerException) {
                         LOGGER.warn(String.format("Unable to get container state '%s'", unknownWorkerException.unknownWorkerId()));
