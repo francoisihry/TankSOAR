@@ -4,7 +4,7 @@ import com.tank.soar.worker_orchestrator.domain.Worker;
 import com.tank.soar.worker_orchestrator.domain.WorkerStatus;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.Objects;
 
 @RegisterForReflection
@@ -12,15 +12,15 @@ public final class WorkerDTO {
 
     private final String workerId;
     private final WorkerStatus workerStatus;
-    private final LocalDateTime lastUpdateStateDate;
-    private final LocalDateTime createdAt;
+    private final ZonedDateTime lastUpdateStateDate;
+    private final ZonedDateTime createdAt;
     private final Boolean hasFinished;
 
     public WorkerDTO(final Worker worker) {
         this.workerId = worker.workerId().id();
         this.workerStatus = worker.workerStatus();
-        this.lastUpdateStateDate = worker.lastUpdateStateDate();
-        this.createdAt = worker.createdAt();
+        this.lastUpdateStateDate = worker.lastUpdateStateDate().zonedDateTime();
+        this.createdAt = worker.createdAt().zonedDateTime();
         this.hasFinished = worker.hasFinished();
     }
 
@@ -32,11 +32,11 @@ public final class WorkerDTO {
         return workerStatus;
     }
 
-    public LocalDateTime getLastUpdateStateDate() {
+    public ZonedDateTime getLastUpdateStateDate() {
         return lastUpdateStateDate;
     }
 
-    public LocalDateTime getCreatedAt() {
+    public ZonedDateTime getCreatedAt() {
         return createdAt;
     }
 

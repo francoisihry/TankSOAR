@@ -2,8 +2,6 @@ package com.tank.soar.worker_orchestrator.domain.usecase;
 
 import com.tank.soar.worker_orchestrator.domain.*;
 
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Objects;
 
 public final class RunScriptUseCase implements UseCase<RunScriptCommand, Worker> {
@@ -24,9 +22,10 @@ public final class RunScriptUseCase implements UseCase<RunScriptCommand, Worker>
     public Worker execute(final RunScriptCommand command) throws UnableToRunScriptUseCaseException {
         try {
             final WorkerId workerId = this.workerIdProvider.provideNewWorkerId();
+            final UTCZonedDateTime executionDate = UTCZonedDateTime.now();// should use a provider - ie an interface and implementation : better testing
             this.workerRepository.createWorker(workerId, command.script(),
-                    LocalDateTime.now(ZoneOffset.UTC), // should use a provider - ie an interface and implementation : better testing
-                    LocalDateTime.now(ZoneOffset.UTC)); // should use a provider - ie an interface and implementation : better testing
+                    executionDate,
+                    executionDate);
             return this.workerContainerManager.runScript(workerId, command.script());
         } catch (final UnableToRunScriptException e) {
             // FIXME

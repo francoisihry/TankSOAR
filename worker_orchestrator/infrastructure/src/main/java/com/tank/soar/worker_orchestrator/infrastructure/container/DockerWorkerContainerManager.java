@@ -19,9 +19,8 @@ import java.io.*;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -112,8 +111,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                     .withWorkerId(workerId)
                     .withWorkerStatus(dockerContainerStatus.toWorkerStatus())
                     .withSource(Source.CONTAINER)
-                    .withLastUpdateStateDate(LocalDateTime.now(ZoneOffset.UTC))
-                    .withCreatedAt(ZonedDateTime.parse(container.getCreated()).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime())
+                    .withCreatedAt(UTCZonedDateTime.of(ZonedDateTime.parse(container.getCreated()).withZoneSameInstant(ZoneOffset.UTC)))
+                    .withLastUpdateStateDate(UTCZonedDateTime.now())
                     .build();
         } catch (final IOException ioException) {
             throw new UnableToRunScriptException(workerId, ioException);
@@ -133,8 +132,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                 .map(container -> WorkerDockerContainer.newBuilder()
                         .withWorkerId(new WorkerId(container.getLabels().get(WORKER_ID)))
                         .withWorkerStatus(DockerContainerStatus.fromDockerStatus(container.getState()).toWorkerStatus())
-                        .withCreatedAt(LocalDateTime.ofEpochSecond(container.getCreated(), 0, ZoneOffset.UTC))
-                        .withLastUpdateStateDate(LocalDateTime.now(ZoneOffset.UTC))
+                        .withCreatedAt(UTCZonedDateTime.of(container.getCreated()))
+                        .withLastUpdateStateDate(UTCZonedDateTime.now())
                         .build())
                 .collect(Collectors.toList());
     }
@@ -145,8 +144,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                 .map(container -> WorkerDockerContainer.newBuilder()
                         .withWorkerId(workerId)
                         .withWorkerStatus(DockerContainerStatus.fromDockerStatus(container.getState().getStatus()).toWorkerStatus())
-                        .withCreatedAt(ZonedDateTime.parse(container.getCreated()).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime())
-                        .withLastUpdateStateDate(LocalDateTime.now(ZoneOffset.UTC))
+                        .withCreatedAt(UTCZonedDateTime.of(ZonedDateTime.parse(container.getCreated()).withZoneSameInstant(ZoneOffset.UTC)))
+                        .withLastUpdateStateDate(UTCZonedDateTime.now())
                         .build());
     }
 
@@ -197,8 +196,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                         final WorkerDockerContainer workerDockerContainer = WorkerDockerContainer.newBuilder()
                                 .withWorkerId(workerId)
                                 .withWorkerStatus(DockerContainerStatus.fromDockerStatus(inspectContainerResponse.getState().getStatus()).toWorkerStatus())
-                                .withCreatedAt(ZonedDateTime.parse(inspectContainerResponse.getCreated()).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime())
-                                .withLastUpdateStateDate(LocalDateTime.now(ZoneOffset.UTC))
+                                .withCreatedAt(UTCZonedDateTime.of(ZonedDateTime.parse(inspectContainerResponse.getCreated()).withZoneSameInstant(ZoneOffset.UTC)))
+                                .withLastUpdateStateDate(UTCZonedDateTime.now())
                                 .build();
                         return new WorkerLogDockerContainer(workerDockerContainer, log);
                     } catch (InterruptedException e) {
@@ -232,8 +231,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                         final WorkerDockerContainer workerDockerContainer = WorkerDockerContainer.newBuilder()
                                 .withWorkerId(workerId)
                                 .withWorkerStatus(DockerContainerStatus.fromDockerStatus(inspectContainerResponse.getState().getStatus()).toWorkerStatus())
-                                .withCreatedAt(ZonedDateTime.parse(inspectContainerResponse.getCreated()).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime())
-                                .withLastUpdateStateDate(LocalDateTime.now(ZoneOffset.UTC))
+                                .withCreatedAt(UTCZonedDateTime.of(ZonedDateTime.parse(inspectContainerResponse.getCreated()).withZoneSameInstant(ZoneOffset.UTC)))
+                                .withLastUpdateStateDate(UTCZonedDateTime.now())
                                 .build();
                         return new WorkerLogDockerContainer(workerDockerContainer, log);
                     } catch (InterruptedException e) {

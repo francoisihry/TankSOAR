@@ -72,8 +72,8 @@ public class WorkerDockerEntityRepositoryTest {
 
         // When
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
 
         // Then
         try (final Connection con = workerDataSource.getConnection();
@@ -88,6 +88,7 @@ public class WorkerDockerEntityRepositoryTest {
                     .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
             assertThat(rsWorker.getObject("lastUpdateStateDate", LocalDateTime.class))
                     .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+            assertThat(rsWorker.getString("zoneOffset")).isEqualTo("Z");
             assertThat(rsWorker.getString("container")).isNull();
             assertThat(rsWorker.getString("stdOut")).isNull();
             assertThat(rsWorker.getString("stdErr")).isNull();
@@ -99,15 +100,15 @@ public class WorkerDockerEntityRepositoryTest {
     public void should_update_worker() throws SQLException {
         // Given
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.RUNNING)
                 .when(worker).workerStatus();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
                 .when(worker).lastUpdateStateDate();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
                 .when(worker).createdAt();
         final ContainerInformation containerInformation = mock(ContainerInformation.class);
         doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();
@@ -132,6 +133,7 @@ public class WorkerDockerEntityRepositoryTest {
                     .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00));
             assertThat(rsWorker.getObject("createdAt", LocalDateTime.class))
                     .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00));
+            assertThat(rsWorker.getString("zoneOffset")).isEqualTo("Z");
             assertThat(rsWorker.getString("container")).isEqualTo("{\"hello\": \"world\"}");
             assertThat(rsWorker.getString("stdOut")).isEqualTo("stdOut");
             assertThat(rsWorker.getString("stdErr")).isEqualTo("stdErr");
@@ -143,8 +145,8 @@ public class WorkerDockerEntityRepositoryTest {
     public void should_list_all_workers() {
         // Given
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
 
         // When
         final List<? extends Worker> workers = workerDockerEntityRepository.listAllWorkers();
@@ -153,8 +155,8 @@ public class WorkerDockerEntityRepositoryTest {
         assertThat(workers).hasSize(1);
         assertThat(workers.get(0)).isEqualTo(new WorkerDockerEntity(new WorkerId("id"),
                 WorkerStatus.CREATING,
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)));
     }
 
     @Test
@@ -162,8 +164,8 @@ public class WorkerDockerEntityRepositoryTest {
     public void should_get_worker() throws Exception {
         // Given
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
 
         // When
         final Worker worker = workerDockerEntityRepository.getWorker(new WorkerId("id"));
@@ -171,8 +173,8 @@ public class WorkerDockerEntityRepositoryTest {
         // Then
         assertThat(worker).isEqualTo(new WorkerDockerEntity(new WorkerId("id"),
                 WorkerStatus.CREATING,
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)));
     }
 
     @Test
@@ -242,15 +244,15 @@ public class WorkerDockerEntityRepositoryTest {
 
     private void givenWorkerLog() {
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.RUNNING)
                 .when(worker).workerStatus();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
                 .when(worker).lastUpdateStateDate();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
                 .when(worker).createdAt();
         final ContainerInformation containerInformation = mock(ContainerInformation.class);
         doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();
@@ -266,8 +268,8 @@ public class WorkerDockerEntityRepositoryTest {
     public void should_has_worker_return_true_when_the_worker_is_present() {
         // Given
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
 
         // When
         final boolean hasWorker = workerDockerEntityRepository.hasWorker(new WorkerId("id"));
@@ -296,8 +298,8 @@ public class WorkerDockerEntityRepositoryTest {
 
         // When
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
 
         // Then
         inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
@@ -313,7 +315,7 @@ public class WorkerDockerEntityRepositoryTest {
         // When
         try {
             workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                    LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                    UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
                     null);
             fail("should have failed !");
         } catch (final Exception e) {
@@ -330,15 +332,15 @@ public class WorkerDockerEntityRepositoryTest {
         // Given
         final InOrder inOrder = inOrder(workerLockMechanism);
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
         final Worker worker = mock(Worker.class);
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.RUNNING)
                 .when(worker).workerStatus();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
                 .when(worker).lastUpdateStateDate();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
                 .when(worker).createdAt();
         final ContainerInformation containerInformation = mock(ContainerInformation.class);
         doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();

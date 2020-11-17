@@ -1,15 +1,11 @@
 package com.tank.soar.worker_orchestrator.domain.usecase;
 
-import com.tank.soar.worker_orchestrator.domain.Worker;
-import com.tank.soar.worker_orchestrator.domain.WorkerContainerManager;
-import com.tank.soar.worker_orchestrator.domain.WorkerId;
-import com.tank.soar.worker_orchestrator.domain.WorkerRepository;
+import com.tank.soar.worker_orchestrator.domain.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
 import java.time.Month;
 import java.util.Arrays;
 import java.util.List;
@@ -38,16 +34,20 @@ public class ListWorkersUseCaseTest {
         // Given
         final Worker worker1 = mock(Worker.class);
         doReturn(new WorkerId("id1")).when(worker1).workerId();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00)).when(worker1).lastUpdateStateDate();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .when(worker1).lastUpdateStateDate();
         final Worker workerContainer1 = mock(Worker.class);
         doReturn(new WorkerId("id1")).when(workerContainer1).workerId();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)).when(workerContainer1).lastUpdateStateDate();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00))
+                .when(workerContainer1).lastUpdateStateDate();
         final Worker worker2 = mock(Worker.class);
         doReturn(new WorkerId("id2")).when(worker2).workerId();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)).when(worker2).lastUpdateStateDate();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00))
+                .when(worker2).lastUpdateStateDate();
         final Worker workerContainer2 = mock(Worker.class);
         doReturn(new WorkerId("id2")).when(workerContainer2).workerId();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 20, 00)).when(workerContainer2).lastUpdateStateDate();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 20, 00))
+                .when(workerContainer2).lastUpdateStateDate();
 
         doReturn(Arrays.asList(workerContainer1, workerContainer2)).when(workerContainerManager).listAllContainers();
         doReturn(Arrays.asList(worker1, worker2)).when(workerRepository).listAllWorkers();
@@ -66,10 +66,12 @@ public class ListWorkersUseCaseTest {
         doReturn(new WorkerId("id1")).when(worker1).workerId();
         final Worker worker2 = mock(Worker.class);
         doReturn(new WorkerId("id2")).when(worker2).workerId();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)).when(worker2).lastUpdateStateDate();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00))
+                .when(worker2).lastUpdateStateDate();
         final Worker workerContainer2 = mock(Worker.class);
         doReturn(new WorkerId("id2")).when(workerContainer2).workerId();
-        doReturn(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 20, 00)).when(workerContainer2).lastUpdateStateDate();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 20, 00))
+                .when(workerContainer2).lastUpdateStateDate();
 
         doReturn(Arrays.asList(workerContainer2)).when(workerContainerManager).listAllContainers();
         doReturn(Arrays.asList(worker1, worker2)).when(workerRepository).listAllWorkers();

@@ -35,7 +35,7 @@ public class ListWorkersUseCase implements UseCase<ListWorkersCommand, List<Work
         return workersByWorkerIds.entrySet()
                 .stream()
                 .map(workerIdListEntry -> workerIdListEntry.getValue().stream()
-                        .sorted(Comparator.comparing(worker -> worker.lastUpdateStateDate()))
+                        .sorted(Comparator.comparing(worker -> worker.lastUpdateStateDate().zonedDateTime()))
                         .reduce((first, second) -> second).get())
                 .collect(Collectors.toList());
     }

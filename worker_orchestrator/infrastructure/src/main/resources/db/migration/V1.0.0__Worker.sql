@@ -5,6 +5,7 @@ CREATE TABLE public.WORKER (
   lastUpdateStateDate timestamp without time zone NOT NULL,
   createdAt timestamp without time zone,
   container jsonb,
+  zoneOffset character varying(255) NOT NULL,
   stdOut text,
   stdErr text,
   CONSTRAINT worker_pkey PRIMARY KEY (workerId)

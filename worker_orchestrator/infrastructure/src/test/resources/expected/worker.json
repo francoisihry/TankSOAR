@@ -7,9 +7,9 @@
   "default": {},
   "examples": [
     {
-      "createdAt": "2020-09-01T10:00:00",
+      "createdAt": "2020-09-01T10:00:00Z",
       "hasFinished": true,
-      "lastUpdateStateDate": "2020-09-01T10:10:00",
+      "lastUpdateStateDate": "2020-09-01T10:10:00Z",
       "workerId": "id",
       "workerStatus": "FINISHED"
     }
@@ -29,7 +29,7 @@
       "description": "An explanation about the purpose of this instance.",
       "default": "",
       "examples": [
-        "2020-09-01T10:00:00"
+        "2020-09-01T10:00:00Z"
       ]
     },
     "hasFinished": {
@@ -49,7 +49,7 @@
       "description": "An explanation about the purpose of this instance.",
       "default": "",
       "examples": [
-        "2020-09-01T10:10:00"
+        "2020-09-01T10:10:00Z"
       ]
     },
     "workerId": {

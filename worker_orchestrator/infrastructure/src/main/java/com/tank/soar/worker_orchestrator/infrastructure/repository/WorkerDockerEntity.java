@@ -1,9 +1,6 @@
 package com.tank.soar.worker_orchestrator.infrastructure.repository;
 
-import com.tank.soar.worker_orchestrator.domain.Source;
-import com.tank.soar.worker_orchestrator.domain.Worker;
-import com.tank.soar.worker_orchestrator.domain.WorkerId;
-import com.tank.soar.worker_orchestrator.domain.WorkerStatus;
+import com.tank.soar.worker_orchestrator.domain.*;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -15,13 +12,13 @@ public final class WorkerDockerEntity implements Worker {
     private final WorkerId workerId;
     private final WorkerStatus workerStatus;
     private final Source source;
-    private final LocalDateTime lastUpdateStateDate;
-    private final LocalDateTime createdAt;
+    private final UTCZonedDateTime lastUpdateStateDate;
+    private final UTCZonedDateTime createdAt;
 
     public WorkerDockerEntity(final WorkerId workerId,
                               final WorkerStatus workerStatus,
-                              final LocalDateTime createdAt,
-                              final LocalDateTime lastUpdateStateDate) {
+                              final UTCZonedDateTime createdAt,
+                              final UTCZonedDateTime lastUpdateStateDate) {
         this.workerId = Objects.requireNonNull(workerId);
         this.workerStatus = Objects.requireNonNull(workerStatus);
         this.source = Source.DATABASE;
@@ -33,8 +30,10 @@ public final class WorkerDockerEntity implements Worker {
         this(
                 new WorkerId(resultSet.getString("workerId")),
                 WorkerStatus.valueOf(resultSet.getString("workerStatus")),
-                resultSet.getObject("createdAt", LocalDateTime.class),
-                resultSet.getObject("lastUpdateStateDate", LocalDateTime.class)
+                UTCZonedDateTime.of(resultSet.getObject("createdAt", LocalDateTime.class),
+                        resultSet.getString("zoneOffset")),
+                UTCZonedDateTime.of(resultSet.getObject("lastUpdateStateDate", LocalDateTime.class),
+                        resultSet.getString("zoneOffset"))
         );
     }
 
@@ -54,12 +53,12 @@ public final class WorkerDockerEntity implements Worker {
     }
 
     @Override
-    public LocalDateTime lastUpdateStateDate() {
+    public UTCZonedDateTime lastUpdateStateDate() {
         return lastUpdateStateDate;
     }
 
     @Override
-    public LocalDateTime createdAt() {
+    public UTCZonedDateTime createdAt() {
         return createdAt;
     }
 

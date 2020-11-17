@@ -1,19 +1,15 @@
 package com.tank.soar.worker_orchestrator.infrastructure.container;
 
-import com.tank.soar.worker_orchestrator.domain.Source;
-import com.tank.soar.worker_orchestrator.domain.Worker;
-import com.tank.soar.worker_orchestrator.domain.WorkerId;
-import com.tank.soar.worker_orchestrator.domain.WorkerStatus;
+import com.tank.soar.worker_orchestrator.domain.*;
 
-import java.time.LocalDateTime;
 import java.util.Objects;
 
 public final class WorkerDockerContainer implements Worker {
 
     private final WorkerId workerId;
     private final WorkerStatus workerStatus;
-    private final LocalDateTime lastUpdateStateDate;
-    private final LocalDateTime createdAt;
+    private final UTCZonedDateTime lastUpdateStateDate;
+    private final UTCZonedDateTime createdAt;
 
     public WorkerDockerContainer(final Builder builder) {
         this.workerId = Objects.requireNonNull(builder.workerId);
@@ -29,8 +25,8 @@ public final class WorkerDockerContainer implements Worker {
     public static final class Builder {
         private WorkerId workerId;
         private WorkerStatus workerStatus;
-        private LocalDateTime lastUpdateStateDate;
-        private LocalDateTime createdAt;
+        private UTCZonedDateTime lastUpdateStateDate;
+        private UTCZonedDateTime createdAt;
 
         public Builder withWorkerId(final WorkerId workerId) {
             this.workerId = workerId;
@@ -42,12 +38,12 @@ public final class WorkerDockerContainer implements Worker {
             return this;
         }
 
-        public Builder withLastUpdateStateDate(final LocalDateTime lastUpdateStateDate) {
+        public Builder withLastUpdateStateDate(final UTCZonedDateTime lastUpdateStateDate) {
             this.lastUpdateStateDate = lastUpdateStateDate;
             return this;
         }
 
-        public Builder withCreatedAt(final LocalDateTime createdAt) {
+        public Builder withCreatedAt(final UTCZonedDateTime createdAt) {
             this.createdAt = createdAt;
             return this;
         }
@@ -74,12 +70,12 @@ public final class WorkerDockerContainer implements Worker {
     }
 
     @Override
-    public LocalDateTime lastUpdateStateDate() {
+    public UTCZonedDateTime lastUpdateStateDate() {
         return lastUpdateStateDate;
     }
 
     @Override
-    public LocalDateTime createdAt() {
+    public UTCZonedDateTime createdAt() {
         return createdAt;
     }
 

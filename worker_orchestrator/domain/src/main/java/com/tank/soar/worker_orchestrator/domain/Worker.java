@@ -1,6 +1,5 @@
 package com.tank.soar.worker_orchestrator.domain;
 
-import java.time.LocalDateTime;
 import java.util.Arrays;
 
 public interface Worker {
@@ -11,9 +10,9 @@ public interface Worker {
 
     Source source();
 
-    LocalDateTime lastUpdateStateDate();
+    UTCZonedDateTime lastUpdateStateDate();
 
-    LocalDateTime createdAt();
+    UTCZonedDateTime createdAt();
 
     default boolean hasFinished() {
         // TODO je devrais rajouter un test parametrée ...

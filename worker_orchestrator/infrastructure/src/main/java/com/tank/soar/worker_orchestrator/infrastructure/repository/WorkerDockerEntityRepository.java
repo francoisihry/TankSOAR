@@ -12,7 +12,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -22,16 +21,16 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
 
     private static final String HAS_WORKER = "SELECT EXISTS(SELECT 1 FROM WORKER WHERE workerId = ?)";
 
-    private static final String CREATE_WORKER = "INSERT INTO WORKER (workerId, script, workerStatus, createdAt, lastUpdateStateDate) " +
-            "VALUES (?, ?, ?, ?, ?)";
+    private static final String CREATE_WORKER = "INSERT INTO WORKER (workerId, script, workerStatus, createdAt, lastUpdateStateDate, zoneOffset) " +
+            "VALUES (?, ?, ?, ?, ?, ?)";
 
-    private static final String UPDATE_WORKER = "UPDATE WORKER SET workerStatus = ?, lastUpdateStateDate = ?, createdAt = ?, container = to_json(?::json), stdOut = ?, stdErr = ? " +
+    private static final String UPDATE_WORKER = "UPDATE WORKER SET workerStatus = ?, lastUpdateStateDate = ?, createdAt = ?, zoneOffset = ?, container = to_json(?::json), stdOut = ?, stdErr = ? " +
             "WHERE workerId = ?";
 
-    private static final String LIST_ALL_WORKERS = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt FROM WORKER";
-    private static final String GET_WORKER = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt FROM WORKER WHERE workerId = ?";
-    private static final String GET_STD_OUT = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, stdOut FROM WORKER WHERE workerId = ?";
-    private static final String GET_STD_ERR = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, stdErr FROM WORKER WHERE workerId = ?";
+    private static final String LIST_ALL_WORKERS = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, zoneOffset FROM WORKER";
+    private static final String GET_WORKER = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, zoneOffset FROM WORKER WHERE workerId = ?";
+    private static final String GET_STD_OUT = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, zoneOffset, stdOut FROM WORKER WHERE workerId = ?";
+    private static final String GET_STD_ERR = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, zoneOffset, stdErr FROM WORKER WHERE workerId = ?";
 
     private final AgroalDataSource workerDataSource;
     private final WorkerLockMechanism workerLockMechanism;
@@ -44,15 +43,16 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
 
     @Override
     public WorkerId createWorker(final WorkerId workerId, final String script,
-                                 final LocalDateTime createdAt, final LocalDateTime lastUpdateStateDate) {
+                                 final UTCZonedDateTime createdAt, final UTCZonedDateTime lastUpdateStateDate) {
         workerLockMechanism.lock(workerId);
         try (final Connection connection = workerDataSource.getConnection();
              final PreparedStatement createWorkerPreparedStatement = connection.prepareStatement(CREATE_WORKER)) {
             createWorkerPreparedStatement.setString(1, workerId.id());
             createWorkerPreparedStatement.setString(2, script);
             createWorkerPreparedStatement.setString(3, WorkerStatus.CREATING.name());
-            createWorkerPreparedStatement.setObject(4, createdAt);
-            createWorkerPreparedStatement.setObject(5, lastUpdateStateDate);
+            createWorkerPreparedStatement.setObject(4, createdAt.localDateTime());
+            createWorkerPreparedStatement.setObject(5, lastUpdateStateDate.localDateTime());
+            createWorkerPreparedStatement.setObject(6, createdAt.zoneOffset().getId());
             final int created = createWorkerPreparedStatement.executeUpdate();
             Validate.validState(created == 1);
             return workerId;
@@ -73,12 +73,13 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
         try (final Connection connection = workerDataSource.getConnection();
              final PreparedStatement saveWorkerPreparedStatement = connection.prepareStatement(UPDATE_WORKER)) {
             saveWorkerPreparedStatement.setString(1, worker.workerStatus().name());
-            saveWorkerPreparedStatement.setObject(2, worker.lastUpdateStateDate());
-            saveWorkerPreparedStatement.setObject(3, worker.createdAt());
-            saveWorkerPreparedStatement.setString(4, containerInformation.fullInformation());
-            saveWorkerPreparedStatement.setString(5, stdOut.log());
-            saveWorkerPreparedStatement.setString(6, stdErr.log());
-            saveWorkerPreparedStatement.setString(7, workerId.id());
+            saveWorkerPreparedStatement.setObject(2, worker.lastUpdateStateDate().localDateTime());
+            saveWorkerPreparedStatement.setObject(3, worker.createdAt().localDateTime());
+            saveWorkerPreparedStatement.setString(4, worker.createdAt().zoneOffset().getId());
+            saveWorkerPreparedStatement.setString(5, containerInformation.fullInformation());
+            saveWorkerPreparedStatement.setString(6, stdOut.log());
+            saveWorkerPreparedStatement.setString(7, stdErr.log());
+            saveWorkerPreparedStatement.setString(8, workerId.id());
             final int updated = saveWorkerPreparedStatement.executeUpdate();
             Validate.validState(updated == 1);
             return worker;
