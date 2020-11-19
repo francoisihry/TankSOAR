@@ -2,6 +2,7 @@ package com.tank.soar.worker_orchestrator.infrastructure.interfaces;
 
 import com.tank.soar.worker_orchestrator.domain.WorkerId;
 import com.tank.soar.worker_orchestrator.domain.usecase.*;
+import com.tank.soar.worker_orchestrator.infrastructure.interfaces.logging.LogStreamDTO;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
@@ -15,19 +16,16 @@ public class WorkerEndpoint {
 
     private final GetWorkerUseCase getWorkerUseCase;
     private final ListWorkersUseCase listWorkersUseCase;
-    private final RetrieveWorkerStdErrUseCase retrieveWorkerStdErrUseCase;
-    private final RetrieveWorkerStdOutUseCase retrieveWorkerStdOutUseCase;
+    private final RetrieveWorkerLogsUseCase retrieveWorkerLogsUseCase;
     private final RunScriptUseCase runScriptUseCase;
 
     public WorkerEndpoint(final GetWorkerUseCase getWorkerUseCase,
                           final ListWorkersUseCase listWorkersUseCase,
-                          final RetrieveWorkerStdErrUseCase retrieveWorkerStdErrUseCase,
-                          final RetrieveWorkerStdOutUseCase retrieveWorkerStdOutUseCase,
+                          final RetrieveWorkerLogsUseCase retrieveWorkerLogsUseCase,
                           final RunScriptUseCase runScriptUseCase) {
         this.getWorkerUseCase = Objects.requireNonNull(getWorkerUseCase);
         this.listWorkersUseCase = Objects.requireNonNull(listWorkersUseCase);
-        this.retrieveWorkerStdErrUseCase = Objects.requireNonNull(retrieveWorkerStdErrUseCase);
-        this.retrieveWorkerStdOutUseCase = Objects.requireNonNull(retrieveWorkerStdOutUseCase);
+        this.retrieveWorkerLogsUseCase = Objects.requireNonNull(retrieveWorkerLogsUseCase);
         this.runScriptUseCase = Objects.requireNonNull(runScriptUseCase);
     }
 
@@ -49,18 +47,27 @@ public class WorkerEndpoint {
                 .collect(Collectors.toList());
     }
 
-    @GET
-    @Path("/{workerId}/stdOut")
+    @POST
+    @Path("/{workerId}/logs")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.APPLICATION_JSON)
-    public WorkerLogDTO getWorkerStdOut(@PathParam("workerId") final String workerId) throws UseCaseException {
-        return new WorkerLogDTO(retrieveWorkerStdOutUseCase.execute(RetrieveWorkerStdOutCommand.newBuilder().withWorkerId(new WorkerId(workerId)).build()));
-    }
-
-    @GET
-    @Path("/{workerId}/stdErr")
-    @Produces(MediaType.APPLICATION_JSON)
-    public WorkerLogDTO getWorkerStdErr(@PathParam("workerId") final String workerId) throws UseCaseException {
-        return new WorkerLogDTO(retrieveWorkerStdErrUseCase.execute(RetrieveWorkerStdErrCommand.newBuilder().withWorkerId(new WorkerId(workerId)).build()));
+    public List<LogStreamDTO> getLogs(@PathParam("workerId") final String workerId,
+                                      @FormParam("stdOut") final boolean stdOut,
+                                      @FormParam("stdErr") final boolean stdErr) {
+        final RetrieveWorkerLogsCommand retrieveWorkerLogsCommand = RetrieveWorkerLogsCommand.newBuilder()
+                .withWorkerId(new WorkerId(workerId))
+                .withStdOut(stdOut)
+                .withStdErr(stdErr)
+                .build();
+        return retrieveWorkerLogsUseCase.execute(retrieveWorkerLogsCommand)
+                .stream()
+                .map(logStream -> LogStreamDTO.newBuilder()
+                        .withWorkerId(logStream.workerId())
+                        .withLogStreamType(logStream.logStreamType())
+                        .withContent(logStream.content())
+                        .build()
+                )
+                .collect(Collectors.toList());
     }
 
     @POST

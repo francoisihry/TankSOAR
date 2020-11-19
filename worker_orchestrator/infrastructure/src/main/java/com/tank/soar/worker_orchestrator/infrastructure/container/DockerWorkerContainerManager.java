@@ -174,67 +174,23 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     }
 
     @Override
-    public Optional<WorkerLog> getStdOut(final WorkerId workerId) {
+    public Optional<List<? extends LogStream>> findLog(final WorkerId workerId,
+                                                       final Boolean stdOut,
+                                                       final Boolean stdErr) {
         return inspectWorkerContainer(workerId)
                 .map(inspectContainerResponse -> {
                     workerLockMechanism.lock(workerId);
                     try {
-                        final LoggingResultCallbackAdapter loggingResultCallbackAdapter = new LoggingResultCallbackAdapter();
+                        final LoggingResultCallbackAdapter loggingResultCallbackAdapter = new LoggingResultCallbackAdapter(workerId);
                         dockerClient
                                 .logContainerCmd(inspectContainerResponse.getId())
-                                .withStdErr(false)
-                                .withStdOut(true)
+                                .withStdOut(stdOut)
+                                .withStdErr(stdErr)
                                 .withFollowStream(false)
                                 .withTailAll()
                                 .exec(loggingResultCallbackAdapter);
                         loggingResultCallbackAdapter.awaitCompletion();
-                        final String log = loggingResultCallbackAdapter
-                                .getStdResponses()
-                                .stream()
-                                .map(LoggingResultCallbackAdapter.StdResponse::getResponse)
-                                .collect(Collectors.joining());
-                        final WorkerDockerContainer workerDockerContainer = WorkerDockerContainer.newBuilder()
-                                .withWorkerId(workerId)
-                                .withWorkerStatus(DockerContainerStatus.fromDockerStatus(inspectContainerResponse.getState().getStatus()).toWorkerStatus())
-                                .withCreatedAt(UTCZonedDateTime.of(ZonedDateTime.parse(inspectContainerResponse.getCreated()).withZoneSameInstant(ZoneOffset.UTC)))
-                                .withLastUpdateStateDate(UTCZonedDateTime.now())
-                                .build();
-                        return new WorkerLogDockerContainer(workerDockerContainer, log);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    } finally {
-                        workerLockMechanism.unlock(workerId);
-                    }
-                });
-    }
-
-    @Override
-    public Optional<WorkerLog> getStdErr(final WorkerId workerId) {
-        return inspectWorkerContainer(workerId)
-                .map(inspectContainerResponse -> {
-                    workerLockMechanism.lock(workerId);
-                    try {
-                        final LoggingResultCallbackAdapter loggingResultCallbackAdapter = new LoggingResultCallbackAdapter();
-                        dockerClient
-                                .logContainerCmd(inspectContainerResponse.getId())
-                                .withStdErr(true)
-                                .withStdOut(false)
-                                .withFollowStream(false)
-                                .withTailAll()
-                                .exec(loggingResultCallbackAdapter);
-                        loggingResultCallbackAdapter.awaitCompletion();
-                        final String log = loggingResultCallbackAdapter
-                                .getStdResponses()
-                                .stream()
-                                .map(LoggingResultCallbackAdapter.StdResponse::getResponse)
-                                .collect(Collectors.joining());
-                        final WorkerDockerContainer workerDockerContainer = WorkerDockerContainer.newBuilder()
-                                .withWorkerId(workerId)
-                                .withWorkerStatus(DockerContainerStatus.fromDockerStatus(inspectContainerResponse.getState().getStatus()).toWorkerStatus())
-                                .withCreatedAt(UTCZonedDateTime.of(ZonedDateTime.parse(inspectContainerResponse.getCreated()).withZoneSameInstant(ZoneOffset.UTC)))
-                                .withLastUpdateStateDate(UTCZonedDateTime.now())
-                                .build();
-                        return new WorkerLogDockerContainer(workerDockerContainer, log);
+                        return loggingResultCallbackAdapter.getStdResponses();
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     } finally {

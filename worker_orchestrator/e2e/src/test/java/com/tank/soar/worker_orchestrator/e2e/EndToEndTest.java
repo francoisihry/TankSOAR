@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
 import static org.awaitility.Awaitility.await;
@@ -147,11 +149,13 @@ public class EndToEndTest {
                 .until(() ->
                         given()
                                 .when()
-                                .get("/workers/" + workerId + "/stdOut")
+                                .formParam("stdOut", Boolean.TRUE)
+                                .formParam("stdErr", Boolean.FALSE)
+                                .post("/workers/" + workerId + "/logs")
                                 .then()
                                 .log().all()
                                 .statusCode(200)
-                                .extract().path("log").equals("hello world\n")
+                                .extract().path("[0].content").equals("hello world")
                 );
     }
 
@@ -167,10 +171,13 @@ public class EndToEndTest {
     }
 
     @Test
-    public void should_get_std_err() {
+    public void should_get_std_err_log() {
         // Given
+        final String script = Stream.of("import sys;",
+                "print('bye bye world', file=sys.stderr);")
+                .collect(Collectors.joining());
         final String workerId = given()
-                .formParam("script", "import sys\nprint(\"bye bye world\", file=sys.stderr)")
+                .formParam("script", script)
                 .when()
                 .post("/workers/runScript")
                 .then()
@@ -183,12 +190,14 @@ public class EndToEndTest {
                 .atMost(10, TimeUnit.SECONDS)
                 .until(() ->
                         given()
+                                .formParam("stdOut", Boolean.FALSE)
+                                .formParam("stdErr", Boolean.TRUE)
                                 .when()
-                                .get("/workers/" + workerId + "/stdErr")
+                                .post("/workers/" + workerId + "/logs")
                                 .then()
                                 .log().all()
                                 .statusCode(200)
-                                .extract().path("log").equals("bye bye world\n")
+                                .extract().path("[0].content").equals("bye bye world")
                 );
     }
 

@@ -6,7 +6,7 @@ public interface WorkerRepository {
 
     WorkerId createWorker(WorkerId workerId, String script, UTCZonedDateTime createdAt, UTCZonedDateTime lastUpdateStateDate);
 
-    Worker saveWorker(Worker worker, ContainerInformation containerInformation, WorkerLog stdOut, WorkerLog stdErr);
+    Worker saveWorker(Worker worker, ContainerInformation containerInformation, List<? extends LogStream> logStreams);
 
     Boolean hasWorker(WorkerId workerId);
 
@@ -14,8 +14,6 @@ public interface WorkerRepository {
 
     Worker getWorker(WorkerId workerId) throws UnknownWorkerException;
 
-    WorkerLog getStdOut(WorkerId workerId) throws UnknownWorkerException;
-
-    WorkerLog getStdErr(WorkerId workerId) throws UnknownWorkerException;
+    List<? extends LogStream> getLog(WorkerId workerId, Boolean stdOut, Boolean stdErr) throws UnknownWorkerException;
 
 }

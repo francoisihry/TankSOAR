@@ -86,10 +86,10 @@ public class LoggingFrameSocketTest {
         // Then
         try (final Session session = ContainerProvider.getWebSocketContainer().connectToServer(Client.class, logsUri)) {
             assertThat(JSON_LOG_MESSAGES.poll(10, TimeUnit.SECONDS))
-                    .isEqualTo("{\"workerId\":\"id\",\"streamType\":\"STDOUT\",\"payload\":\"hello\\n\"}");
+                    .isEqualTo("{\"workerId\":\"id\",\"logStreamType\":\"STDOUT\",\"content\":\"hello\"}");
             TimeUnit.SECONDS.sleep(3);
             assertThat(JSON_LOG_MESSAGES.poll(1, TimeUnit.SECONDS))
-                    .isEqualTo("{\"workerId\":\"id\",\"streamType\":\"STDERR\",\"payload\":\"bye bye world\\n\"}");
+                    .isEqualTo("{\"workerId\":\"id\",\"logStreamType\":\"STDERR\",\"content\":\"bye bye world\"}");
         }
     }
 

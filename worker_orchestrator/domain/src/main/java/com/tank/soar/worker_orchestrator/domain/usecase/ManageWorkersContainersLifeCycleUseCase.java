@@ -5,7 +5,6 @@ import com.tank.soar.worker_orchestrator.domain.*;
 import java.util.List;
 import java.util.Objects;
 
-import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,16 +36,14 @@ public class ManageWorkersContainersLifeCycleUseCase implements UseCase<VoidComm
                 .peek(worker -> {
                     try {
                         final ContainerInformation containerMetadata = workerContainerManager.getContainerMetadata(worker.workerId());
-                        final WorkerLog stdOut = workerContainerManager.getStdOut(worker.workerId()).get();
-                        final WorkerLog stdErr = workerContainerManager.getStdErr(worker.workerId()).get();
-                        Validate.validState(stdOut.workerId().equals(worker.workerId()));
-                        Validate.validState(stdOut.hasFinishedProducingLog().equals(worker.hasFinished()));
-                        Validate.validState(stdErr.workerId().equals(worker.workerId()));
-                        Validate.validState(stdErr.hasFinishedProducingLog().equals(worker.hasFinished()));
-                        workerRepository.saveWorker(worker, containerMetadata, stdOut, stdErr);
+                        final List<? extends LogStream> logStreams = workerContainerManager.findLog(worker.workerId(), Boolean.TRUE, Boolean.TRUE)
+                                .orElseThrow(() -> new UnknownWorkerException(worker.workerId()));
+                        workerRepository.saveWorker(worker, containerMetadata, logStreams);
                         LOGGER.info(String.format("Container state workerId '%s' saved", worker.workerId().id()));
                     } catch (final UnknownWorkerException unknownWorkerException) {
                         LOGGER.warn(String.format("Unable to get container state '%s'", unknownWorkerException.unknownWorkerId()));
+                    } catch (final RuntimeException e) {
+                        throw e;
                     }
                 })
                 .filter(Worker::hasFinished)

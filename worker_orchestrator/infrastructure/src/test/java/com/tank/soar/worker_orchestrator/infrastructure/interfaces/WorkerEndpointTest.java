@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import io.restassured.module.jsv.JsonSchemaValidator;
 
 import java.time.Month;
+import java.util.Arrays;
 import java.util.Collections;
 
 import static io.restassured.RestAssured.given;
@@ -24,10 +25,7 @@ public class WorkerEndpointTest {
     private ListWorkersUseCase listWorkersUseCase;
 
     @InjectMock
-    private RetrieveWorkerStdErrUseCase retrieveWorkerStdErrUseCase;
-
-    @InjectMock
-    private RetrieveWorkerStdOutUseCase retrieveWorkerStdOutUseCase;
+    private RetrieveWorkerLogsUseCase retrieveWorkerLogsUseCase;
 
     @InjectMock
     private RunScriptUseCase runScriptUseCase;
@@ -102,73 +100,117 @@ public class WorkerEndpointTest {
     }
 
     @Test
-    public void should_get_worker_std_out() {
+    public void should_get_worker_std_out_log() {
         // Given
-        final WorkerLog workerLog = mock(WorkerLog.class);
-        doReturn(new WorkerId("id")).when(workerLog).workerId();
-        doReturn(Boolean.TRUE).when(workerLog).hasFinishedProducingLog();
-        doReturn("hello stdout").when(workerLog).log();
-        doReturn(workerLog).when(retrieveWorkerStdOutUseCase).execute(RetrieveWorkerStdOutCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+        final LogStream logStreamStdOut = mock(LogStream.class);
+        doReturn(new WorkerId("id")).when(logStreamStdOut).workerId();
+        doReturn("stdOut").when(logStreamStdOut).content();
+        doReturn(LogStreamType.STDOUT).when(logStreamStdOut).logStreamType();
+        doCallRealMethod().when(logStreamStdOut).toJsonStringRepresentation();
+        doReturn(Collections.singletonList(logStreamStdOut))
+                .when(retrieveWorkerLogsUseCase)
+                .execute(RetrieveWorkerLogsCommand.newBuilder()
+                        .withWorkerId(new WorkerId("id"))
+                        .withStdOut(Boolean.TRUE)
+                        .withStdErr(Boolean.FALSE).build());
 
         // When && Then
         given()
+                .formParam("stdOut", Boolean.TRUE)
+                .formParam("stdErr", Boolean.FALSE)
                 .when()
-                .get("/workers/id/stdOut")
+                .post("/workers/id/logs")
                 .then()
                 .log().all()
                 .statusCode(200)
-                .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/stdOut.json"))
-                .body("workerId", equalTo("id"))
-                .body("hasFinishedProducingLog", equalTo(Boolean.TRUE))
-                .body("log", equalTo("hello stdout"));
+                .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/logs.json"))
+                .body("[0].content", equalTo("stdOut"))
+                .body("[0].logStreamType", equalTo("STDOUT"))
+                .body("[0].workerId", equalTo("id"));
     }
 
     @Test
-    public void should_get_worker_std_out_return_expected_response_when_worker_does_not_exist() {
+    public void should_get_worker_std_err_log() {
         // Given
-        doThrow(new UnknownWorkerUseCaseException(new WorkerId("id"))).when(retrieveWorkerStdOutUseCase).execute(RetrieveWorkerStdOutCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
-
+        final LogStream logStreamStdErr = mock(LogStream.class);
+        doReturn(new WorkerId("id")).when(logStreamStdErr).workerId();
+        doReturn("stdErr").when(logStreamStdErr).content();
+        doReturn(LogStreamType.STDERR).when(logStreamStdErr).logStreamType();
+        doCallRealMethod().when(logStreamStdErr).toJsonStringRepresentation();
+        doReturn(Collections.singletonList(logStreamStdErr))
+                .when(retrieveWorkerLogsUseCase)
+                .execute(RetrieveWorkerLogsCommand.newBuilder()
+                        .withWorkerId(new WorkerId("id"))
+                        .withStdOut(Boolean.FALSE)
+                        .withStdErr(Boolean.TRUE).build());
         // When && Then
         given()
+                .formParam("stdOut", Boolean.FALSE)
+                .formParam("stdErr", Boolean.TRUE)
                 .when()
-                .get("/workers/id/stdOut")
-                .then()
-                .log().all()
-                .statusCode(404)
-                .body(equalTo("Unknown worker 'id'."));
-    }
-
-    @Test
-    public void should_get_worker_std_err() {
-        // Given
-        final WorkerLog workerLog = mock(WorkerLog.class);
-        doReturn(new WorkerId("id")).when(workerLog).workerId();
-        doReturn(Boolean.TRUE).when(workerLog).hasFinishedProducingLog();
-        doReturn("hello stderr").when(workerLog).log();
-        doReturn(workerLog).when(retrieveWorkerStdErrUseCase).execute(RetrieveWorkerStdErrCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
-
-        // When && Then
-        given()
-                .when()
-                .get("/workers/id/stdErr")
+                .post("/workers/id/logs")
                 .then()
                 .log().all()
                 .statusCode(200)
-                .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/stdErr.json"))
-                .body("workerId", equalTo("id"))
-                .body("hasFinishedProducingLog", equalTo(Boolean.TRUE))
-                .body("log", equalTo("hello stderr"));
+                .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/logs.json"))
+                .body("[0].content", equalTo("stdErr"))
+                .body("[0].logStreamType", equalTo("STDERR"))
+                .body("[0].workerId", equalTo("id"));
     }
 
     @Test
-    public void should_get_worker_std_err_return_expected_response_when_worker_does_not_exist() {
+    public void should_get_std_out_and_std_err_logs_in_order() throws Exception {
         // Given
-        doThrow(new UnknownWorkerUseCaseException(new WorkerId("id"))).when(retrieveWorkerStdErrUseCase).execute(RetrieveWorkerStdErrCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+        final LogStream logStreamStdOut = mock(LogStream.class);
+        doReturn(new WorkerId("id")).when(logStreamStdOut).workerId();
+        doReturn("stdOut").when(logStreamStdOut).content();
+        doReturn(LogStreamType.STDOUT).when(logStreamStdOut).logStreamType();
+        doCallRealMethod().when(logStreamStdOut).toJsonStringRepresentation();
+        final LogStream logStreamStdErr = mock(LogStream.class);
+        doReturn(new WorkerId("id")).when(logStreamStdErr).workerId();
+        doReturn("stdErr").when(logStreamStdErr).content();
+        doReturn(LogStreamType.STDERR).when(logStreamStdErr).logStreamType();
+        doCallRealMethod().when(logStreamStdErr).toJsonStringRepresentation();
+
+        doReturn(Arrays.asList(logStreamStdOut, logStreamStdErr))
+                .when(retrieveWorkerLogsUseCase)
+                .execute(RetrieveWorkerLogsCommand.newBuilder()
+                        .withWorkerId(new WorkerId("id"))
+                        .withStdOut(Boolean.TRUE)
+                        .withStdErr(Boolean.TRUE).build());
+        // When && Then
+        given()
+                .formParam("stdOut", Boolean.TRUE)
+                .formParam("stdErr", Boolean.TRUE)
+                .when()
+                .post("/workers/id/logs")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/logs.json"))
+                .body("[0].content", equalTo("stdOut"))
+                .body("[0].logStreamType", equalTo("STDOUT"))
+                .body("[0].workerId", equalTo("id"))
+                .body("[1].content", equalTo("stdErr"))
+                .body("[1].logStreamType", equalTo("STDERR"))
+                .body("[1].workerId", equalTo("id"));
+    }
+
+    @Test
+    public void should_get_worker_logs_return_expected_response_when_worker_does_not_exist() {
+        // Given
+        doThrow(new UnknownWorkerUseCaseException(new WorkerId("id"))).when(retrieveWorkerLogsUseCase)
+                .execute(RetrieveWorkerLogsCommand.newBuilder()
+                        .withWorkerId(new WorkerId("id"))
+                        .withStdOut(Boolean.TRUE)
+                        .withStdErr(Boolean.TRUE).build());
 
         // When && Then
         given()
+                .formParam("stdOut", Boolean.TRUE)
+                .formParam("stdErr", Boolean.TRUE)
                 .when()
-                .get("/workers/id/stdErr")
+                .post("/workers/id/logs")
                 .then()
                 .log().all()
                 .statusCode(404)

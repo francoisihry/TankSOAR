@@ -15,8 +15,6 @@ public interface WorkerContainerManager {
 
     void deleteContainer(WorkerId workerId) throws UnknownWorkerException;
 
-    Optional<WorkerLog> getStdOut(WorkerId workerId);
-
-    Optional<WorkerLog> getStdErr(WorkerId workerId);
+    Optional<List<? extends LogStream>> findLog(WorkerId workerId, Boolean stdOut, Boolean stdErr) throws UnknownWorkerException;
 
 }

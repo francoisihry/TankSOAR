@@ -2,6 +2,7 @@ package com.tank.soar.worker_orchestrator.infrastructure.container;
 
 import com.github.dockerjava.api.DockerClient;
 import com.tank.soar.worker_orchestrator.domain.*;
+import com.tank.soar.worker_orchestrator.domain.usecase.RunScriptCommand;
 import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectSpy;
@@ -18,6 +19,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
@@ -184,63 +187,77 @@ public class DockerWorkerContainerManagerTest {
 
     @Test
     @Order(8)
-    public void should_get_std_out_return_hello_world() throws Exception {
+    public void should_find_std_out_log_return_hello_world() throws Exception {
         // Given
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "print(\"hello world\")");
 
         // When
         await().atMost(10, TimeUnit.SECONDS)
-                .until(() -> !"".equals(dockerWorkerContainerManager.getStdOut(new WorkerId("id")).get().log()));
-        final Optional<WorkerLog> workerLog = dockerWorkerContainerManager.getStdOut(new WorkerId("id"));
+                .until(() -> dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.TRUE, Boolean.FALSE).isPresent());
+        final List<? extends LogStream> logsStreams = dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.TRUE, Boolean.FALSE).get();
 
         // Then
-
-        assertThat(workerLog.isPresent()).isTrue();
-        assertThat(workerLog.get().log()).isEqualTo("hello world\n");
-        assertThat(workerLog.get().workerId()).isEqualTo(new WorkerId("id"));
-        assertThat(workerLog.get().hasFinishedProducingLog()).isNotNull();
+        assertThat(logsStreams.size()).isEqualTo(1);
+        assertThat(logsStreams.get(0).content()).isEqualTo("hello world");
+        assertThat(logsStreams.get(0).workerId()).isEqualTo(new WorkerId("id"));
+        assertThat(logsStreams.get(0).logStreamType()).isEqualTo(LogStreamType.STDOUT);
     }
 
     @Test
     @Order(9)
-    public void should_get_std_out_return_optional_empty_on_unknown_worker() throws Exception {
+    public void should_find_log_return_optional_empty_on_unknown_worker() throws Exception {
         // Given
 
         // When
-        final Optional<WorkerLog> workerLog = dockerWorkerContainerManager.getStdOut(new WorkerId("id"));
+        final Optional<List<? extends LogStream>> logsStreams = dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.TRUE, Boolean.TRUE);
 
         // Then
-        assertThat(workerLog.isPresent()).isFalse();
+        assertThat(logsStreams.isPresent()).isFalse();
     }
 
     @Test
     @Order(10)
-    public void should_get_std_err_return_bye_bye_world() throws Exception {
+    public void should_find_std_err_log_return_bye_bye_world() throws Exception {
         // Given
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "import sys\nprint(\"bye bye world\", file=sys.stderr)");
 
         // When
         await().atMost(10, TimeUnit.SECONDS)
-                .until(() -> !"".equals(dockerWorkerContainerManager.getStdErr(new WorkerId("id")).get().log()));
-        final Optional<WorkerLog> workerLog = dockerWorkerContainerManager.getStdErr(new WorkerId("id"));
+                .until(() -> dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.FALSE, Boolean.TRUE).isPresent());
+        final List<? extends LogStream> logsStreams = dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.FALSE, Boolean.TRUE).get();
 
         // Then
-        assertThat(workerLog.isPresent()).isTrue();
-        assertThat(workerLog.get().log()).isEqualTo("bye bye world\n");
-        assertThat(workerLog.get().workerId()).isEqualTo(new WorkerId("id"));
-        assertThat(workerLog.get().hasFinishedProducingLog()).isNotNull();
+        assertThat(logsStreams.size()).isEqualTo(1);
+        assertThat(logsStreams.get(0).content()).isEqualTo("bye bye world");
+        assertThat(logsStreams.get(0).workerId()).isEqualTo(new WorkerId("id"));
+        assertThat(logsStreams.get(0).logStreamType()).isEqualTo(LogStreamType.STDERR);
     }
 
     @Test
     @Order(11)
-    public void should_get_std_err_return_optional_empty_on_unknown_worker() throws Exception {
-        // Given
+    public void should_find_std_out_and_std_err_logs_in_order() throws Exception {
+        // Given - need to add a sleep to ensure order will be respected ...
+        final String script = Stream.of("import sys;",
+                "import time;",
+                "print('hello');",
+                "time.sleep(1);",
+                "print('bye bye world', file=sys.stderr);").collect(Collectors.joining());
+        dockerWorkerContainerManager.runScript(new WorkerId("id"), script);
 
         // When
-        final Optional<WorkerLog> workerLog = dockerWorkerContainerManager.getStdErr(new WorkerId("id"));
+        await().atMost(10, TimeUnit.SECONDS)
+                .until(() -> dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.TRUE, Boolean.TRUE).isPresent());
+        await().atMost(10, TimeUnit.SECONDS)
+                .until(() -> dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.TRUE, Boolean.TRUE).get().size() >= 2);
+        final List<? extends LogStream> logsStreams = dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.TRUE, Boolean.TRUE).get();
 
         // Then
-        assertThat(workerLog.isPresent()).isFalse();
+        assertThat(logsStreams.get(0).content()).isEqualTo("hello");
+        assertThat(logsStreams.get(0).workerId()).isEqualTo(new WorkerId("id"));
+        assertThat(logsStreams.get(0).logStreamType()).isEqualTo(LogStreamType.STDOUT);
+        assertThat(logsStreams.get(1).content()).isEqualTo("bye bye world");
+        assertThat(logsStreams.get(1).workerId()).isEqualTo(new WorkerId("id"));
+        assertThat(logsStreams.get(1).logStreamType()).isEqualTo(LogStreamType.STDERR);
     }
 
     @Test
@@ -321,11 +338,11 @@ public class DockerWorkerContainerManagerTest {
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "import time; print('hello'); time.sleep(60); print('hello 2')");
 
         // Then
-        await()
-                .atMost(10, TimeUnit.SECONDS)
-                .until(() -> !"".equals(dockerWorkerContainerManager.getStdOut(new WorkerId("id")).get().log()));
-        assertThat(dockerWorkerContainerManager.getStdOut(new WorkerId("id")).get().log())
-                .isEqualTo("hello\n");
+        await().atMost(10, TimeUnit.SECONDS)
+                .until(() -> dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.TRUE, Boolean.FALSE).isPresent());
+        final List<? extends LogStream> logsStreams = dockerWorkerContainerManager.findLog(new WorkerId("id"), Boolean.TRUE, Boolean.FALSE).get();
+        assertThat(logsStreams.size()).isEqualTo(1);
+        assertThat(logsStreams.get(0).content()).isEqualTo("hello");
     }
 
 }

@@ -37,14 +37,8 @@ public class UseCaseProducers {
 
     @Produces
     @ApplicationScoped
-    public RetrieveWorkerStdErrUseCase produceRetrieveWorkerStdErrUseCase() {
-        return new RetrieveWorkerStdErrUseCase(workerContainerManager, workerRepository);
-    }
-
-    @Produces
-    @ApplicationScoped
-    public RetrieveWorkerStdOutUseCase produceRetrieveWorkerStdOutUseCase() {
-        return new RetrieveWorkerStdOutUseCase(workerContainerManager, workerRepository);
+    public RetrieveWorkerLogsUseCase produceRetrieveWorkerLogsUseCase() {
+        return new RetrieveWorkerLogsUseCase(workerContainerManager, workerRepository);
     }
 
     @Produces

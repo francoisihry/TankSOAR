@@ -4,11 +4,11 @@ import javax.websocket.EncodeException;
 import javax.websocket.Encoder;
 import javax.websocket.EndpointConfig;
 
-public class LoggingFrameDTOEncoder implements Encoder.Text<LoggingFrameDTO> {
+public class LoggingFrameDTOEncoder implements Encoder.Text<LogStreamDTO> {
 
     @Override
-    public String encode(final LoggingFrameDTO object) throws EncodeException {
-        return object.toJson().toString();
+    public String encode(final LogStreamDTO object) throws EncodeException {
+        return object.toJsonStringRepresentation();
     }
 
     @Override

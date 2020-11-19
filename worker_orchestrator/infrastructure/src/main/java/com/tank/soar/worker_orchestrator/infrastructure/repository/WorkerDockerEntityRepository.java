@@ -8,6 +8,9 @@ import org.apache.commons.lang3.Validate;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.Any;
+import javax.json.Json;
+import javax.json.JsonValue;
+import java.io.StringReader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -15,6 +18,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class WorkerDockerEntityRepository implements WorkerRepository {
@@ -24,13 +29,11 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
     private static final String CREATE_WORKER = "INSERT INTO WORKER (workerId, script, workerStatus, createdAt, lastUpdateStateDate, zoneOffset) " +
             "VALUES (?, ?, ?, ?, ?, ?)";
 
-    private static final String UPDATE_WORKER = "UPDATE WORKER SET workerStatus = ?, lastUpdateStateDate = ?, createdAt = ?, zoneOffset = ?, container = to_json(?::json), stdOut = ?, stdErr = ? " +
+    private static final String UPDATE_WORKER = "UPDATE WORKER SET workerStatus = ?, lastUpdateStateDate = ?, createdAt = ?, zoneOffset = ?, container = to_json(?::json), logStreams = to_json(?::json) " +
             "WHERE workerId = ?";
 
     private static final String LIST_ALL_WORKERS = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, zoneOffset FROM WORKER";
     private static final String GET_WORKER = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, zoneOffset FROM WORKER WHERE workerId = ?";
-    private static final String GET_STD_OUT = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, zoneOffset, stdOut FROM WORKER WHERE workerId = ?";
-    private static final String GET_STD_ERR = "SELECT workerId, workerStatus, lastUpdateStateDate, createdAt, zoneOffset, stdErr FROM WORKER WHERE workerId = ?";
 
     private final AgroalDataSource workerDataSource;
     private final WorkerLockMechanism workerLockMechanism;
@@ -66,9 +69,15 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
     @Override
     public Worker saveWorker(final Worker worker,
                              final ContainerInformation containerInformation,
-                             final WorkerLog stdOut,
-                             final WorkerLog stdErr) {
+                             final List<? extends LogStream> logStreams) {
         final WorkerId workerId = worker.workerId();
+        final String logStreamsAsJsonString = new StringBuilder("[")
+                .append(
+                        logStreams.stream()
+                                .map(LogStream::toJsonStringRepresentation)
+                                .collect(Collectors.joining(",")))
+                .append("]")
+                .toString();
         workerLockMechanism.lock(workerId);
         try (final Connection connection = workerDataSource.getConnection();
              final PreparedStatement saveWorkerPreparedStatement = connection.prepareStatement(UPDATE_WORKER)) {
@@ -77,9 +86,8 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
             saveWorkerPreparedStatement.setObject(3, worker.createdAt().localDateTime());
             saveWorkerPreparedStatement.setString(4, worker.createdAt().zoneOffset().getId());
             saveWorkerPreparedStatement.setString(5, containerInformation.fullInformation());
-            saveWorkerPreparedStatement.setString(6, stdOut.log());
-            saveWorkerPreparedStatement.setString(7, stdErr.log());
-            saveWorkerPreparedStatement.setString(8, workerId.id());
+            saveWorkerPreparedStatement.setString(6, logStreamsAsJsonString);
+            saveWorkerPreparedStatement.setString(7, workerId.id());
             final int updated = saveWorkerPreparedStatement.executeUpdate();
             Validate.validState(updated == 1);
             return worker;
@@ -136,15 +144,32 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
         }
     }
 
+    // https://stackoverflow.com/questions/24804348/how-to-filter-json-array-per-each-returned-row/24806907
     @Override
-    public WorkerLog getStdOut(final WorkerId workerId) throws UnknownWorkerException {
+    public List<? extends LogStream> getLog(final WorkerId workerId,
+                                            final Boolean stdOut,
+                                            final Boolean stdErr) throws UnknownWorkerException {
+        final StringBuilder queryBuilder = new StringBuilder("SELECT workerId, array_to_json(array_agg(l)) FROM WORKER w, json_array_elements(w.logStreams::json) l WHERE ");
+        final String whereLogStreamTypes = Stream.of(Boolean.TRUE.equals(stdOut) ? LogStreamType.STDOUT.name() : null,
+                Boolean.TRUE.equals(stdErr) ? LogStreamType.STDERR.name() : null)
+                .filter(Objects::nonNull)
+                .map(value -> String.format("l->>'logStreamType' = '%s'", value))
+                .collect(Collectors.joining(" OR "));
+        final String query = queryBuilder
+                .append("(")
+                .append(whereLogStreamTypes)
+                .append(") AND workerId = ? GROUP BY workerId").toString();
         try (final Connection connection = workerDataSource.getConnection();
-             final PreparedStatement preparedStatement = connection.prepareStatement(GET_STD_OUT)) {
+             final PreparedStatement preparedStatement = connection.prepareStatement(query)) {
             preparedStatement.setString(1, workerId.id());
             try (final ResultSet resultSet = preparedStatement.executeQuery()) {
                 if (resultSet.next()) {
-                    final WorkerDockerEntity workerDockerEntity = new WorkerDockerEntity(resultSet);
-                    return new WorkerLogDockerEntity(workerDockerEntity, resultSet.getString("stdOut"));
+                    // TODO je fais deux mappings... Optimisation : retourner un String wrapper dans une class porteuse de sens
+                    return Json.createReader(new StringReader(resultSet.getString(2))).readArray()
+                            .stream()
+                            .map(JsonValue::asJsonObject)
+                            .map(LogStreamEntity::new)
+                            .collect(Collectors.toList());
                 } else {
                     throw new UnknownWorkerException(workerId);
                 }
@@ -154,21 +179,4 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
         }
     }
 
-    @Override
-    public WorkerLog getStdErr(final WorkerId workerId) throws UnknownWorkerException {
-        try (final Connection connection = workerDataSource.getConnection();
-             final PreparedStatement preparedStatement = connection.prepareStatement(GET_STD_ERR)) {
-            preparedStatement.setString(1, workerId.id());
-            try (final ResultSet resultSet = preparedStatement.executeQuery()) {
-                if (resultSet.next()) {
-                    final WorkerDockerEntity workerDockerEntity = new WorkerDockerEntity(resultSet);
-                    return new WorkerLogDockerEntity(workerDockerEntity, resultSet.getString("stdErr"));
-                } else {
-                    throw new UnknownWorkerException(workerId);
-                }
-            }
-        } catch (final SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
 }
