@@ -37,7 +37,6 @@ public class WorkerEndpointTest {
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.FINISHED).when(worker).workerStatus();
         doReturn(Boolean.TRUE).when(worker).hasFinished();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00)).when(worker).createdAt();
         doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)).when(worker).lastUpdateStateDate();
         doReturn(Source.CONTAINER).when(worker).source();
         doReturn(worker).when(getWorkerUseCase).execute(GetWorkerCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
@@ -53,7 +52,6 @@ public class WorkerEndpointTest {
                 .body("workerId", equalTo("id"))
                 .body("lastUpdateStateDate", equalTo("2020-09-01T10:10:00Z"))
                 .body("workerStatus", equalTo("FINISHED"))
-                .body("createdAt", equalTo("2020-09-01T10:00:00Z"))
                 .body("hasFinished", equalTo(Boolean.TRUE));
     }
 
@@ -79,7 +77,6 @@ public class WorkerEndpointTest {
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.FINISHED).when(worker).workerStatus();
         doReturn(Boolean.TRUE).when(worker).hasFinished();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00)).when(worker).createdAt();
         doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)).when(worker).lastUpdateStateDate();
         doReturn(Source.CONTAINER).when(worker).source();
         doReturn(Collections.singletonList(worker)).when(listWorkersUseCase).execute(any());
@@ -95,7 +92,6 @@ public class WorkerEndpointTest {
                 .body("[0].workerId", equalTo("id"))
                 .body("[0].lastUpdateStateDate", equalTo("2020-09-01T10:10:00Z"))
                 .body("[0].workerStatus", equalTo("FINISHED"))
-                .body("[0].createdAt", equalTo("2020-09-01T10:00:00Z"))
                 .body("[0].hasFinished", equalTo(Boolean.TRUE));
     }
 
@@ -224,7 +220,6 @@ public class WorkerEndpointTest {
         doReturn(new WorkerId("id")).when(worker).workerId();
         doReturn(WorkerStatus.FINISHED).when(worker).workerStatus();
         doReturn(Boolean.TRUE).when(worker).hasFinished();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00)).when(worker).createdAt();
         doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)).when(worker).lastUpdateStateDate();
         doReturn(Source.CONTAINER).when(worker).source();
         doReturn(worker).when(runScriptUseCase).execute(RunScriptCommand.newBuilder().withScript("print(\"hello world\")").build());
@@ -241,7 +236,6 @@ public class WorkerEndpointTest {
                 .body("workerId", equalTo("id"))
                 .body("lastUpdateStateDate", equalTo("2020-09-01T10:10:00Z"))
                 .body("workerStatus", equalTo("FINISHED"))
-                .body("createdAt", equalTo("2020-09-01T10:00:00Z"))
                 .body("hasFinished", equalTo(Boolean.TRUE));
     }
 

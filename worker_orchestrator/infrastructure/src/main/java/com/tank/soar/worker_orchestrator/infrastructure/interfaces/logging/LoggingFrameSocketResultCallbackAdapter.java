@@ -8,7 +8,6 @@ import com.tank.soar.worker_orchestrator.infrastructure.container.ContainerUtils
 
 import javax.websocket.Session;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Objects;
 
 public class LoggingFrameSocketResultCallbackAdapter extends ResultCallback.Adapter<Frame> {

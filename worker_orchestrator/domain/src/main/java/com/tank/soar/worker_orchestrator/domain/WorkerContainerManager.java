@@ -11,8 +11,6 @@ public interface WorkerContainerManager {
 
     Optional<Worker> findContainer(WorkerId workerId);
 
-    ContainerInformation getContainerMetadata(WorkerId workerId) throws UnknownWorkerException;
-
     void deleteContainer(WorkerId workerId) throws UnknownWorkerException;
 
     Optional<List<? extends LogStream>> findLog(WorkerId workerId, Boolean stdOut, Boolean stdErr) throws UnknownWorkerException;

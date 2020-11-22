@@ -23,9 +23,7 @@ public final class RunScriptUseCase implements UseCase<RunScriptCommand, Worker>
         try {
             final WorkerId workerId = this.workerIdProvider.provideNewWorkerId();
             final UTCZonedDateTime executionDate = UTCZonedDateTime.now();// should use a provider - ie an interface and implementation : better testing
-            this.workerRepository.createWorker(workerId, command.script(),
-                    executionDate,
-                    executionDate);
+            this.workerRepository.createWorker(workerId, command.script(), executionDate);
             return this.workerContainerManager.runScript(workerId, command.script());
         } catch (final UnableToRunScriptException e) {
             // FIXME

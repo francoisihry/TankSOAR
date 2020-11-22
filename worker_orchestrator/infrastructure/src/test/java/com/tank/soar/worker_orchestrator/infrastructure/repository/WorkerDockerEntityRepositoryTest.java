@@ -1,7 +1,10 @@
 package com.tank.soar.worker_orchestrator.infrastructure.repository;
 
+import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.tank.soar.worker_orchestrator.domain.*;
 import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
+import com.tank.soar.worker_orchestrator.infrastructure.container.DockerStateChanged;
+import com.tank.soar.worker_orchestrator.infrastructure.container.StdResponse;
 import com.tank.soar.worker_orchestrator.resources.PostgresqlTestResource;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.agroal.DataSource;
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
+import javax.enterprise.event.Event;
 import javax.inject.Inject;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -48,6 +52,7 @@ public class WorkerDockerEntityRepositoryTest {
         try (final Connection con = workerDataSource.getConnection();
              final Statement stmt = con.createStatement()) {
             stmt.executeUpdate("TRUNCATE TABLE WORKER");
+            stmt.executeUpdate("TRUNCATE TABLE DOCKER_STATE_SNAPSHOT");
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -59,7 +64,8 @@ public class WorkerDockerEntityRepositoryTest {
         assertThatCode(() -> {
             try (final Connection con = workerDataSource.getConnection();
                  final Statement stmt = con.createStatement();
-                 final ResultSet rsConsumedEvent = stmt.executeQuery("SELECT * FROM WORKER")) {
+                 final ResultSet rsWorker = stmt.executeQuery("SELECT * FROM WORKER");
+                 final ResultSet rsDockerStateSnapshot = stmt.executeQuery("SELECT * FROM DOCKER_STATE_SNAPSHOT")) {
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -73,8 +79,7 @@ public class WorkerDockerEntityRepositoryTest {
 
         // When
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
 
         // Then
         try (final Connection con = workerDataSource.getConnection();
@@ -84,59 +89,9 @@ public class WorkerDockerEntityRepositoryTest {
             rsWorker.next();
             assertThat(rsWorker.getString("workerId")).isEqualTo("id");
             assertThat(rsWorker.getString("script")).isEqualTo("print(\"hello world\")");
-            assertThat(rsWorker.getString("workerStatus")).isEqualTo("CREATING");
             assertThat(rsWorker.getObject("createdAt", LocalDateTime.class))
                     .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
-            assertThat(rsWorker.getObject("lastUpdateStateDate", LocalDateTime.class))
-                    .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
             assertThat(rsWorker.getString("zoneOffset")).isEqualTo("Z");
-            assertThat(rsWorker.getString("container")).isNull();
-            assertThat(rsWorker.getString("logStreams")).isNull();
-        }
-    }
-
-    @Test
-    @Order(3)
-    public void should_update_worker() throws SQLException {
-        // Given
-        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
-        final Worker worker = mock(Worker.class);
-        doReturn(new WorkerId("id")).when(worker).workerId();
-        doReturn(WorkerStatus.RUNNING)
-                .when(worker).workerStatus();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
-                .when(worker).lastUpdateStateDate();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
-                .when(worker).createdAt();
-        final ContainerInformation containerInformation = mock(ContainerInformation.class);
-        doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();
-        final LogStream logStream = mock(LogStream.class);
-        doReturn(new WorkerId("id")).when(logStream).workerId();
-        doReturn("hello world").when(logStream).content();
-        doReturn(LogStreamType.STDOUT).when(logStream).logStreamType();
-        doCallRealMethod().when(logStream).toJsonStringRepresentation();
-
-        // When
-        workerDockerEntityRepository.saveWorker(worker, containerInformation, Collections.singletonList(logStream));
-
-        // Then
-        try (final Connection con = workerDataSource.getConnection();
-             final Statement stmt = con.createStatement();
-             final ResultSet rsWorker = stmt.executeQuery("SELECT * FROM WORKER")) {
-
-            rsWorker.next();
-            assertThat(rsWorker.getString("workerId")).isEqualTo("id");
-            assertThat(rsWorker.getString("script")).isEqualTo("print(\"hello world\")");
-            assertThat(Arrays.asList(rsWorker.getString("workerStatus"))).containsAnyOf("FINISHED", "RUNNING");
-            assertThat(rsWorker.getObject("lastUpdateStateDate", LocalDateTime.class))
-                    .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00));
-            assertThat(rsWorker.getObject("createdAt", LocalDateTime.class))
-                    .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00));
-            assertThat(rsWorker.getString("zoneOffset")).isEqualTo("Z");
-            assertThat(rsWorker.getString("container")).isEqualTo("{\"hello\": \"world\"}");
-            assertThat(rsWorker.getString("logStreams")).isEqualTo("[{\"content\": \"hello world\", \"workerId\": \"id\", \"logStreamType\": \"STDOUT\"}]");
         }
     }
 
@@ -145,18 +100,19 @@ public class WorkerDockerEntityRepositoryTest {
     public void should_list_all_workers() {
         // Given
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
 
         // When
         final List<? extends Worker> workers = workerDockerEntityRepository.listAllWorkers();
 
         // Then
         assertThat(workers).hasSize(1);
-        assertThat(workers.get(0)).isEqualTo(new WorkerDockerEntity(new WorkerId("id"),
-                WorkerStatus.CREATING,
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)));
+        assertThat(workers.get(0)).isEqualTo(WorkerDockerEntity
+                .newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withCreatedAt(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .withWorkerSnapshotDockerEntities(Collections.emptyList())
+                .build());
     }
 
     @Test
@@ -164,17 +120,18 @@ public class WorkerDockerEntityRepositoryTest {
     public void should_get_worker() throws Exception {
         // Given
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
 
         // When
         final Worker worker = workerDockerEntityRepository.getWorker(new WorkerId("id"));
 
         // Then
-        assertThat(worker).isEqualTo(new WorkerDockerEntity(new WorkerId("id"),
-                WorkerStatus.CREATING,
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)));
+        assertThat(worker).isEqualTo(WorkerDockerEntity
+                .newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withCreatedAt(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .withWorkerSnapshotDockerEntities(Collections.emptyList())
+                .build());
     }
 
     @Test
@@ -255,62 +212,109 @@ public class WorkerDockerEntityRepositoryTest {
         assertThat(workerLog.get(1)).isEqualTo(new LogStreamEntity(new WorkerId("id"), LogStreamType.STDERR, "stdErr"));
     }
 
-    private void givenWorkerLog() {
-        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
-        final Worker worker = mock(Worker.class);
-        doReturn(new WorkerId("id")).when(worker).workerId();
-        doReturn(WorkerStatus.RUNNING)
-                .when(worker).workerStatus();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
-                .when(worker).lastUpdateStateDate();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
-                .when(worker).createdAt();
-        final ContainerInformation containerInformation = mock(ContainerInformation.class);
-        doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();
+    @Inject
+    Event<DockerStateChanged> dockerStateChangedEvent;
 
+    @Test
+    @Order(10)
+    public void should_store_docker_state_on_docker_state_changed() throws SQLException {
+        // Given
 
-        final LogStream logStreamStdOut = mock(LogStream.class);
-        doReturn(new WorkerId("id")).when(logStreamStdOut).workerId();
-        doReturn("stdOut").when(logStreamStdOut).content();
-        doReturn(LogStreamType.STDOUT).when(logStreamStdOut).logStreamType();
-        doCallRealMethod().when(logStreamStdOut).toJsonStringRepresentation();
-        final LogStream logStreamStdErr = mock(LogStream.class);
-        doReturn(new WorkerId("id")).when(logStreamStdErr).workerId();
-        doReturn("stdErr").when(logStreamStdErr).content();
-        doReturn(LogStreamType.STDERR).when(logStreamStdErr).logStreamType();
-        doCallRealMethod().when(logStreamStdErr).toJsonStringRepresentation();
+        // When
+        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withContainer(new InspectContainerResponse())
+                .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .withStdResponses(Arrays.asList(
+                        StdResponse.newBuilder()
+                                .withWorkerId(new WorkerId("id"))
+                                .withLogStreamType(LogStreamType.STDOUT)
+                                .withContent("stdOut")
+                                .build(),
+                        StdResponse.newBuilder()
+                                .withWorkerId(new WorkerId("id"))
+                                .withLogStreamType(LogStreamType.STDERR)
+                                .withContent("stdErr")
+                                .build()))
+                .build());
 
-        workerDockerEntityRepository.saveWorker(worker, containerInformation,
-                Arrays.asList(logStreamStdOut, logStreamStdErr));
+        // Then
+        try (final Connection con = workerDataSource.getConnection();
+             final Statement stmt = con.createStatement()) {
+            final ResultSet resultSet = stmt.executeQuery("SELECT workerId, container, logStreams, snapshotDate, zoneOffset FROM DOCKER_STATE_SNAPSHOT");
+            assertThat(resultSet.next()).isTrue();
+            assertThat(resultSet.getString("workerId")).isEqualTo("id");
+            assertThat(resultSet.getString("container")).isEqualTo("{\"Id\": null, \"Args\": null, \"Name\": null, \"Node\": null, \"Path\": null, \"Image\": null, \"State\": null, \"Config\": null, \"Driver\": null, \"Mounts\": null, \"Created\": null, \"ExecIDs\": null, \"LogPath\": null, \"Volumes\": null, \"Platform\": null, \"HostsPath\": null, \"VolumesRW\": null, \"ExecDriver\": null, \"HostConfig\": null, \"MountLabel\": null, \"SizeRootFs\": null, \"GraphDriver\": null, \"HostnamePath\": null, \"ProcessLabel\": null, \"RestartCount\": null, \"ResolvConfPath\": null, \"NetworkSettings\": null}");
+            assertThat(resultSet.getString("logStreams")).isEqualTo("[{\"content\": \"stdOut\", \"workerId\": \"id\", \"logStreamType\": \"STDOUT\"}, {\"content\": \"stdErr\", \"workerId\": \"id\", \"logStreamType\": \"STDERR\"}]");
+            assertThat(resultSet.getString("snapshotDate")).isEqualTo("2020-09-01 10:00:00");
+            assertThat(resultSet.getString("zoneOffset")).isEqualTo("Z");
+        }
+    }
+
+    @Test
+    @Order(11)
+    public void should_store_docker_state_use_locking_mechanism() throws SQLException {
+        // Given
+        final InOrder inOrder = inOrder(workerLockMechanism);
+
+        // When
+        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withContainer(new InspectContainerResponse())
+                .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .withStdResponses(Collections.emptyList())
+                .build());
+
+        // Then
+        inOrder.verify(workerLockMechanism).lock(new WorkerId("id"));
+        inOrder.verify(workerLockMechanism).unlock(new WorkerId("id"));
     }
 
     @Test
     @Order(12)
-    public void should_has_worker_return_true_when_the_worker_is_present() {
+    public void should_store_docker_state_be_unlocked_when_exception_is_thrown() {
         // Given
-        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+        final DockerStateChanged dockerStateChanged = DockerStateChanged.newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withContainer(new InspectContainerResponse())
+                .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .withStdResponses(Collections.emptyList())
+                .build();
+        dockerStateChangedEvent.fire(dockerStateChanged);
+        reset(workerLockMechanism);
 
         // When
-        final boolean hasWorker = workerDockerEntityRepository.hasWorker(new WorkerId("id"));
+        try {
+            dockerStateChangedEvent.fire(dockerStateChanged);
+            fail("should have failed ! due to the primary key on workerId and snapshotDate");
+        } catch (final Exception e) {
+
+        }
 
         // Then
-        assertThat(hasWorker).isTrue();
+        verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
     }
 
-    @Test
-    @Order(13)
-    public void should_has_worker_return_false_when_the_worker_is_not_present() {
-        // Given
+    private void givenWorkerLog() {
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
 
-        // When
-        final boolean hasWorker = workerDockerEntityRepository.hasWorker(new WorkerId("id"));
-
-        // Then
-        assertThat(hasWorker).isFalse();
+        final StdResponse stdResponseStdout = StdResponse.newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withLogStreamType(LogStreamType.STDOUT)
+                .withContent("stdOut")
+                .build();
+        final StdResponse stdResponseStderr = StdResponse.newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withLogStreamType(LogStreamType.STDERR)
+                .withContent("stdErr")
+                .build();
+        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withContainer(new InspectContainerResponse())
+                .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .withStdResponses(Arrays.asList(stdResponseStdout, stdResponseStderr))
+                .build());
     }
 
     @Test
@@ -321,8 +325,7 @@ public class WorkerDockerEntityRepositoryTest {
 
         // When
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
 
         // Then
         inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
@@ -338,58 +341,7 @@ public class WorkerDockerEntityRepositoryTest {
         // When
         try {
             workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                    UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
                     null);
-            fail("should have failed !");
-        } catch (final Exception e) {
-
-        }
-
-        // Then
-        verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
-    }
-
-    @Test
-    @Order(16)
-    public void should_save_worker_use_locking_mechanism() {
-        // Given
-        final InOrder inOrder = inOrder(workerLockMechanism);
-        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
-                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00));
-        final Worker worker = mock(Worker.class);
-        doReturn(new WorkerId("id")).when(worker).workerId();
-        doReturn(WorkerStatus.RUNNING)
-                .when(worker).workerStatus();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
-                .when(worker).lastUpdateStateDate();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 11, 00))
-                .when(worker).createdAt();
-        final ContainerInformation containerInformation = mock(ContainerInformation.class);
-        doReturn("{\"hello\":\"world\"}").when(containerInformation).fullInformation();
-        final List<? extends LogStream> logStreams = Collections.emptyList();
-
-        // When
-        workerDockerEntityRepository.saveWorker(worker, containerInformation, logStreams);
-
-        // Then
-        inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
-        // I do not know how to check that the query has been done between
-        inOrder.verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
-    }
-
-    @Test
-    @Order(17)
-    public void should_save_worker_be_unlocked_when_exception_is_thrown() {
-        // Given
-        final Worker worker = mock(Worker.class);
-        doReturn(new WorkerId("id")).when(worker).workerId();
-        final ContainerInformation containerInformation = mock(ContainerInformation.class);
-        final List<? extends LogStream> logStreams = Collections.emptyList();
-
-        // When
-        try {
-            workerDockerEntityRepository.saveWorker(worker, containerInformation, logStreams);
             fail("should have failed !");
         } catch (final Exception e) {
 

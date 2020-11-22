@@ -5,9 +5,12 @@ import com.tank.soar.worker_orchestrator.e2e.resources.EndToEndTestResource;
 import io.agroal.api.AgroalDataSource;
 import io.agroal.api.configuration.supplier.AgroalPropertiesReader;
 import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.RestAssured;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,18 +18,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 
+import java.net.URI;
 import java.sql.Connection;
-import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.restassured.RestAssured.given;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -43,6 +50,11 @@ public class EndToEndTest {
     String workersUsername;
     @ConfigProperty(name = "quarkus.datasource.workers.password")
     String workersPassword;
+
+    @TestHTTPResource("/workersLifecycle")
+    URI workersLifecycleUri;
+
+    private static final LinkedBlockingDeque<String> JSON_WORKER_LIFECYCLE_MESSAGE = new LinkedBlockingDeque<>();
 
     AgroalDataSource workerDataSource;
 
@@ -89,9 +101,10 @@ public class EndToEndTest {
                                 .withForce(true)
                                 .exec()
                 );
-        try (final Connection connection = workerDataSource.getConnection();
-             final PreparedStatement truncateTableWorkerPreparedStatement = connection.prepareStatement("TRUNCATE TABLE WORKER")) {
-            truncateTableWorkerPreparedStatement.executeUpdate();
+        try (final Connection con = workerDataSource.getConnection();
+             final Statement stmt = con.createStatement()) {
+            stmt.executeUpdate("TRUNCATE TABLE WORKER");
+            stmt.executeUpdate("TRUNCATE TABLE DOCKER_STATE_SNAPSHOT");
         } catch (final SQLException e) {
             throw new RuntimeException(e);
         }
@@ -122,7 +135,10 @@ public class EndToEndTest {
     }
 
     @Test
-    public void should_run_an_hello_world_script() {
+    public void should_run_an_hello_world_script() throws Exception {
+        final WorkerLifecycleClient workerLifecycleClient = new WorkerLifecycleClient(workersLifecycleUri);
+        workerLifecycleClient.connect();
+
         final String workerId = given()
                 .formParam("script", "print(\"hello world\")")
                 .when()
@@ -131,6 +147,21 @@ public class EndToEndTest {
                 .log().all()
                 .statusCode(200)
                 .extract().path("workerId");
+
+        assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS)).contains(workerId).contains("CREATED");
+        assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS)).contains(workerId).contains("RUNNING");
+        assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS)).contains(workerId).contains("FINISHED");
+
+        try (final Connection con = workerDataSource.getConnection();
+             final Statement stmt = con.createStatement()) {
+            final ResultSet countWorkerRS = stmt.executeQuery("SELECT COUNT(*) FROM WORKER");
+            countWorkerRS.next();
+            assertThat(countWorkerRS.getLong(1)).isEqualTo(1l);
+            final ResultSet countDockerStateSnapshotRS = stmt.executeQuery("SELECT COUNT(*) FROM DOCKER_STATE_SNAPSHOT");
+            countDockerStateSnapshotRS.next();
+            assertThat(countDockerStateSnapshotRS.getLong(1)).isEqualTo(3l);
+        }
+        // ici le log !!! trop compliqué. Je dois connaitre l'id avant pour l'injecter dans l'url ...
 
         await()
                 .atMost(10, TimeUnit.SECONDS)
@@ -188,8 +219,8 @@ public class EndToEndTest {
         // When && Then
         await()
                 .atMost(10, TimeUnit.SECONDS)
-                .until(() ->
-                        given()
+                .until(() -> {
+                    int nbOfLogs = given()
                                 .formParam("stdOut", Boolean.FALSE)
                                 .formParam("stdErr", Boolean.TRUE)
                                 .when()
@@ -197,10 +228,47 @@ public class EndToEndTest {
                                 .then()
                                 .log().all()
                                 .statusCode(200)
-                                .extract().path("[0].content").equals("bye bye world")
-                );
+                                .extract()
+                                .path("$.size()");
+                    return nbOfLogs > 0l;
+                });
+
+        given()
+                .formParam("stdOut", Boolean.FALSE)
+                .formParam("stdErr", Boolean.TRUE)
+                .when()
+                .post("/workers/" + workerId + "/logs")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body("[0].content", equalTo("bye bye world"));
     }
 
-    // TODO faire des tests de performance en bombardant la creation de containers ...
+    public static class WorkerLifecycleClient extends WebSocketClient {
 
+        public WorkerLifecycleClient(final URI serverUri) {
+            super(serverUri);
+        }
+
+        @Override
+        public void onOpen(final ServerHandshake serverHandshake) {
+            System.out.println("opened");
+        }
+
+        @Override
+        public void onMessage(final String jsonWorkerLifecycleMessage) {
+            JSON_WORKER_LIFECYCLE_MESSAGE.add(jsonWorkerLifecycleMessage);
+        }
+
+        @Override
+        public void onClose(final int i, final String s, final boolean b) {
+
+        }
+
+        @Override
+        public void onError(final Exception e) {
+
+        }
+    }
+    // TODO faire des tests de performance en bombardant la creation de containers ...
 }

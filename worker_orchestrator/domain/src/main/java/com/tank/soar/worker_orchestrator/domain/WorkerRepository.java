@@ -4,11 +4,7 @@ import java.util.List;
 
 public interface WorkerRepository {
 
-    WorkerId createWorker(WorkerId workerId, String script, UTCZonedDateTime createdAt, UTCZonedDateTime lastUpdateStateDate);
-
-    Worker saveWorker(Worker worker, ContainerInformation containerInformation, List<? extends LogStream> logStreams);
-
-    Boolean hasWorker(WorkerId workerId);
+    WorkerId createWorker(WorkerId workerId, String script, UTCZonedDateTime createdAt);
 
     List<? extends Worker> listAllWorkers();
 

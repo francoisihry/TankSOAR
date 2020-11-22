@@ -42,17 +42,32 @@ public class RunScriptUseCaseTest {
     }
 
     @Test
-    public void should_save_worker_container_state() throws Exception {
+    public void should_save_created_worker() throws Exception {
         // Given
         final Worker worker = mock(Worker.class);
         doReturn(worker).when(workerContainerManager).runScript(new WorkerId("id"),"script");
-        final InOrder inOrder = inOrder(workerRepository);
 
         // When
         runScriptUseCase.execute(RunScriptCommand.newBuilder().withScript("script").build());
 
         // Then
-        verify(workerRepository, times(1)).createWorker(eq(new WorkerId("id")), eq("script"), any(), any());
+        verify(workerRepository, times(1)).createWorker(eq(new WorkerId("id")), eq("script"), any());
+    }
+
+    @Test
+    public void should_save_created_worker_before_running_script() throws Exception {
+        // Given
+        final Worker worker = mock(Worker.class);
+        doReturn(worker).when(workerContainerManager).runScript(new WorkerId("id"),"script");
+        final InOrder inOrder = inOrder(workerRepository, workerContainerManager);
+
+        // When
+        runScriptUseCase.execute(RunScriptCommand.newBuilder().withScript("script").build());
+
+        // Then
+        // inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
+        inOrder.verify(workerRepository, times(1)).createWorker(any(), any(), any());
+        inOrder.verify(workerContainerManager, times(1)).runScript(any(), any());
     }
 
 }

@@ -7,7 +7,6 @@
   "default": {},
   "examples": [
     {
-      "createdAt": "2020-09-01T10:00:00Z",
       "hasFinished": true,
       "lastUpdateStateDate": "2020-09-01T10:10:00Z",
       "workerId": "id",
@@ -15,23 +14,12 @@
     }
   ],
   "required": [
-    "createdAt",
     "hasFinished",
     "lastUpdateStateDate",
     "workerId",
     "workerStatus"
   ],
   "properties": {
-    "createdAt": {
-      "$id": "#/properties/createdAt",
-      "type": "string",
-      "title": "The createdAt schema",
-      "description": "An explanation about the purpose of this instance.",
-      "default": "",
-      "examples": [
-        "2020-09-01T10:00:00Z"
-      ]
-    },
     "hasFinished": {
       "$id": "#/properties/hasFinished",
       "type": "boolean",

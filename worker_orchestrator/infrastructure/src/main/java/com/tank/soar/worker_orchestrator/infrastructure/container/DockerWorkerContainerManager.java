@@ -8,23 +8,26 @@ import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Image;
 import com.tank.soar.worker_orchestrator.domain.*;
 import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
+import io.quarkus.runtime.Startup;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.event.Event;
 import javax.enterprise.inject.Any;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.ZonedDateTime;
-import java.time.ZoneOffset;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
+@Startup
 public class DockerWorkerContainerManager implements WorkerContainerManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DockerWorkerContainerManager.class);
@@ -38,10 +41,23 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     private final String pythonImageId;
     private final WorkerLockMechanism workerLockMechanism;
 
+    // max 10 // running containers TODO I should change it to be dynamic
+    private final ExecutorService dockerContainersLifecycle = Executors.newFixedThreadPool(10);
+
+    private final Event<DockerStateChanged> dockerStateChangedEvent;
+    private final Event<WorkerStateChanged> workerStateChangedEvent;
+    private final DockerLastUpdateStateDateProvider dockerLastUpdateStateDateProvider;
+
     public DockerWorkerContainerManager(final DockerClient dockerClient,
-                                        @Any final WorkerLockMechanism workerLockMechanism) throws URISyntaxException {
+                                        @Any final WorkerLockMechanism workerLockMechanism,
+                                        final Event<DockerStateChanged> dockerStateChangedEvent,
+                                        final Event<WorkerStateChanged> workerStateChangedEvent,
+                                        final DockerLastUpdateStateDateProvider dockerLastUpdateStateDateProvider) throws URISyntaxException {
         this.dockerClient = Objects.requireNonNull(dockerClient);
         this.workerLockMechanism = Objects.requireNonNull(workerLockMechanism);
+        this.dockerStateChangedEvent = Objects.requireNonNull(dockerStateChangedEvent);
+        this.workerStateChangedEvent = Objects.requireNonNull(workerStateChangedEvent);
+        this.dockerLastUpdateStateDateProvider = Objects.requireNonNull(dockerLastUpdateStateDateProvider);
         // build the python image if not present
         final Optional<Image> pythonTankSOARDockerImage = dockerClient.listImagesCmd()
                 .withLabelFilter(Collections.singletonMap(IMAGE_TYPE, PYTHON_IMAGE_TYPE))
@@ -68,6 +84,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     @Override
     public Worker runScript(final WorkerId workerId, final String script) throws UnableToRunScriptException {
         workerLockMechanism.lock(workerId);
+        final InspectContainerResponse containerCreated;
         try {
             // create container
             final CreateContainerResponse workerContainer = dockerClient.createContainerCmd(pythonImageId)
@@ -100,41 +117,51 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
             }
             LOGGER.info(String.format("Script copied into container workerId '%s'", workerId.id()));
             Files.deleteIfExists(tempFile);
-
-            // start it in asynchronous way
-            dockerClient.startContainerCmd(workerContainer.getId()).exec();
-            LOGGER.info(String.format("Container workerId '%s' started.", workerId.id()));
-
-            final InspectContainerResponse container = inspectWorkerContainer(workerId).get();
-            final DockerContainerStatus dockerContainerStatus = DockerContainerStatus.fromDockerStatus(container.getState().getStatus());
-            return NewDockerContainerWorker.newBuilder()
-                    .withWorkerId(workerId)
-                    .withWorkerStatus(dockerContainerStatus.toWorkerStatus())
-                    .withSource(Source.CONTAINER)
-                    .withCreatedAt(UTCZonedDateTime.of(ZonedDateTime.parse(container.getCreated()).withZoneSameInstant(ZoneOffset.UTC)))
-                    .withLastUpdateStateDate(UTCZonedDateTime.now())
-                    .build();
+            containerCreated = dockerClient.inspectContainerCmd(workerId.id()).exec();
         } catch (final IOException ioException) {
             throw new UnableToRunScriptException(workerId, ioException);
         } finally {
             workerLockMechanism.unlock(workerId);
         }
+        final UTCZonedDateTime dockerStateChangedDate = dockerLastUpdateStateDateProvider.lastUpdateStateDate(containerCreated);
+        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+                .withWorkerId(workerId)
+                .withContainer(containerCreated)
+                .withDockerStateChangedDate(dockerStateChangedDate)
+                .withStdResponses(Collections.emptyList())
+                .build());
+        final WorkerDockerContainer workerDockerContainer = WorkerDockerContainer.newBuilder()
+                .withWorkerId(workerId)
+                .withWorkerStatus(DockerContainerStatus
+                        .fromDockerStatus(containerCreated.getState().getStatus())
+                        .toWorkerStatus())
+                .withLastUpdateStateDate(dockerStateChangedDate)
+                .build();
+        workerStateChangedEvent.fire(new WorkerStateChanged(workerDockerContainer));
+        dockerContainersLifecycle.submit(new DockerLifecycleRunnable(workerId, dockerClient,
+                dockerStateChangedEvent,
+                workerStateChangedEvent,
+                dockerLastUpdateStateDateProvider,
+                workerLockMechanism));
+        return workerDockerContainer;
     }
 
     @Override
     public List<? extends Worker> listAllContainers() {
+        // TODO should use a global lock
         return dockerClient.listContainersCmd()
                 .withShowAll(true)
                 .exec()
                 .stream()
                 .filter(container -> container.getLabels() != null)
                 .filter(container -> container.getLabels().containsKey(WORKER_ID))
-                .map(container -> WorkerDockerContainer.newBuilder()
-                        .withWorkerId(new WorkerId(container.getLabels().get(WORKER_ID)))
-                        .withWorkerStatus(DockerContainerStatus.fromDockerStatus(container.getState()).toWorkerStatus())
-                        .withCreatedAt(UTCZonedDateTime.of(container.getCreated()))
-                        .withLastUpdateStateDate(UTCZonedDateTime.now())
-                        .build())
+                .map(container -> {
+                    final InspectContainerResponse inspectContainerResponse = dockerClient.inspectContainerCmd(container.getId()).exec();
+                    return WorkerDockerContainer.newBuilder()
+                            .withWorkerId(new WorkerId(container.getLabels().get(WORKER_ID)))
+                            .withWorkerStatus(DockerContainerStatus.fromDockerStatus(container.getState()).toWorkerStatus())
+                            .withLastUpdateStateDate(dockerLastUpdateStateDateProvider.lastUpdateStateDate(inspectContainerResponse))
+                            .build();})
                 .collect(Collectors.toList());
     }
 
@@ -144,16 +171,8 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
                 .map(container -> WorkerDockerContainer.newBuilder()
                         .withWorkerId(workerId)
                         .withWorkerStatus(DockerContainerStatus.fromDockerStatus(container.getState().getStatus()).toWorkerStatus())
-                        .withCreatedAt(UTCZonedDateTime.of(ZonedDateTime.parse(container.getCreated()).withZoneSameInstant(ZoneOffset.UTC)))
-                        .withLastUpdateStateDate(UTCZonedDateTime.now())
+                        .withLastUpdateStateDate(dockerLastUpdateStateDateProvider.lastUpdateStateDate(container))
                         .build());
-    }
-
-    @Override
-    public DockerContainerInformation getContainerMetadata(final WorkerId workerId) throws UnknownWorkerException {
-        return inspectWorkerContainer(workerId)
-                .map(DockerContainerInformation::new)
-                .orElseThrow(() -> new UnknownWorkerException(workerId));
     }
 
     @Override

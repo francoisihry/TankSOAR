@@ -1,7 +1,12 @@
 package com.tank.soar.worker_orchestrator.infrastructure.container;
 
+import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.tank.soar.worker_orchestrator.domain.UTCZonedDateTime;
 import com.tank.soar.worker_orchestrator.domain.WorkerStatus;
+import com.tank.soar.worker_orchestrator.infrastructure.UTCZonedDateTimeProvider;
 
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 
 public enum DockerContainerStatus {
@@ -16,6 +21,14 @@ public enum DockerContainerStatus {
         public WorkerStatus toWorkerStatus() {
             return WorkerStatus.CREATED;
         }
+
+        @Override
+        public UTCZonedDateTime lastUpdateStateDate(final InspectContainerResponse inspectContainerResponse,
+                                                    final UTCZonedDateTimeProvider utcZonedDateTimeProvider) {
+            return UTCZonedDateTime.of(ZonedDateTime.parse(inspectContainerResponse.getCreated())
+                    .withZoneSameInstant(ZoneOffset.UTC));
+        }
+
     },
     RESTARTING {
         @Override
@@ -27,6 +40,14 @@ public enum DockerContainerStatus {
         public WorkerStatus toWorkerStatus() {
             return WorkerStatus.RUNNING;
         }
+
+        @Override
+        public UTCZonedDateTime lastUpdateStateDate(final InspectContainerResponse inspectContainerResponse,
+                                                    final UTCZonedDateTimeProvider utcZonedDateTimeProvider) {
+            return UTCZonedDateTime.of(ZonedDateTime.parse(inspectContainerResponse.getState().getStartedAt())
+                    .withZoneSameInstant(ZoneOffset.UTC));
+        }
+
     },
     RUNNING {
         @Override
@@ -38,6 +59,13 @@ public enum DockerContainerStatus {
         public WorkerStatus toWorkerStatus() {
             return WorkerStatus.RUNNING;
         }
+
+        @Override
+        public UTCZonedDateTime lastUpdateStateDate(final InspectContainerResponse inspectContainerResponse,
+                                                    final UTCZonedDateTimeProvider utcZonedDateTimeProvider) {
+            return utcZonedDateTimeProvider.now();
+        }
+
     },
     REMOVING {
         @Override
@@ -49,6 +77,13 @@ public enum DockerContainerStatus {
         public WorkerStatus toWorkerStatus() {
             return WorkerStatus.FINISHED;
         }
+
+        @Override
+        public UTCZonedDateTime lastUpdateStateDate(final InspectContainerResponse inspectContainerResponse,
+                                                    final UTCZonedDateTimeProvider utcZonedDateTimeProvider) {
+            return utcZonedDateTimeProvider.now();
+        }
+
     },
     PAUSED {
         @Override
@@ -60,6 +95,13 @@ public enum DockerContainerStatus {
         public WorkerStatus toWorkerStatus() {
             return WorkerStatus.RUNNING;
         }
+
+        @Override
+        public UTCZonedDateTime lastUpdateStateDate(final InspectContainerResponse inspectContainerResponse,
+                                                    final UTCZonedDateTimeProvider utcZonedDateTimeProvider) {
+            return utcZonedDateTimeProvider.now();
+        }
+
     },
     EXITED {
         @Override
@@ -71,6 +113,14 @@ public enum DockerContainerStatus {
         public WorkerStatus toWorkerStatus() {
             return WorkerStatus.FINISHED;
         }
+
+        @Override
+        public UTCZonedDateTime lastUpdateStateDate(final InspectContainerResponse inspectContainerResponse,
+                                                    final UTCZonedDateTimeProvider utcZonedDateTimeProvider) {
+            return UTCZonedDateTime.of(ZonedDateTime.parse(inspectContainerResponse.getState().getFinishedAt())
+                    .withZoneSameInstant(ZoneOffset.UTC));
+        }
+
     },
     DEAD {
         @Override
@@ -82,12 +132,23 @@ public enum DockerContainerStatus {
         public WorkerStatus toWorkerStatus() {
             return WorkerStatus.ERROR;
         }
+
+        @Override
+        public UTCZonedDateTime lastUpdateStateDate(final InspectContainerResponse inspectContainerResponse,
+                                                    final UTCZonedDateTimeProvider utcZonedDateTimeProvider) {
+            return UTCZonedDateTime.of(ZonedDateTime.parse(inspectContainerResponse.getState().getFinishedAt())
+                    .withZoneSameInstant(ZoneOffset.UTC));
+        }
+
     }
     ;
 
     public abstract String dockerStatus();
 
     public abstract WorkerStatus toWorkerStatus();
+
+    public abstract UTCZonedDateTime lastUpdateStateDate(final InspectContainerResponse inspectContainerResponse,
+                                                         final UTCZonedDateTimeProvider utcZonedDateTimeProvider);
 
     public static final DockerContainerStatus fromDockerStatus(final String dockerStatus) {
         return Arrays.asList(DockerContainerStatus.values())

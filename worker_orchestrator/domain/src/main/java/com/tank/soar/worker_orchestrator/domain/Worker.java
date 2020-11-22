@@ -12,8 +12,6 @@ public interface Worker {
 
     UTCZonedDateTime lastUpdateStateDate();
 
-    UTCZonedDateTime createdAt();
-
     default boolean hasFinished() {
         // TODO je devrais rajouter un test parametrée ...
         return Arrays.asList(WorkerStatus.ERROR_CREATING, WorkerStatus.FINISHED, WorkerStatus.ERROR)

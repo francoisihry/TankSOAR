@@ -5,7 +5,7 @@ import org.apache.commons.lang3.Validate;
 import java.time.*;
 import java.util.Objects;
 
-public final class UTCZonedDateTime {
+public final class UTCZonedDateTime implements Comparable<UTCZonedDateTime> {
 
     private final ZonedDateTime zonedDateTime;
 
@@ -75,4 +75,10 @@ public final class UTCZonedDateTime {
                 "zonedDateTime=" + zonedDateTime +
                 '}';
     }
+
+    @Override
+    public int compareTo(final UTCZonedDateTime utcZonedDateTime) {
+        return zonedDateTime.compareTo(utcZonedDateTime.zonedDateTime());
+    }
+
 }

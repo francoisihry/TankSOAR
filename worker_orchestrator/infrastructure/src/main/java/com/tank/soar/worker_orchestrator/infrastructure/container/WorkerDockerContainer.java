@@ -9,13 +9,11 @@ public final class WorkerDockerContainer implements Worker {
     private final WorkerId workerId;
     private final WorkerStatus workerStatus;
     private final UTCZonedDateTime lastUpdateStateDate;
-    private final UTCZonedDateTime createdAt;
 
     public WorkerDockerContainer(final Builder builder) {
         this.workerId = Objects.requireNonNull(builder.workerId);
         this.workerStatus = Objects.requireNonNull(builder.workerStatus);
         this.lastUpdateStateDate = Objects.requireNonNull(builder.lastUpdateStateDate);
-        this.createdAt = Objects.requireNonNull(builder.createdAt);
     }
 
     public static final Builder newBuilder() {
@@ -26,7 +24,6 @@ public final class WorkerDockerContainer implements Worker {
         private WorkerId workerId;
         private WorkerStatus workerStatus;
         private UTCZonedDateTime lastUpdateStateDate;
-        private UTCZonedDateTime createdAt;
 
         public Builder withWorkerId(final WorkerId workerId) {
             this.workerId = workerId;
@@ -40,11 +37,6 @@ public final class WorkerDockerContainer implements Worker {
 
         public Builder withLastUpdateStateDate(final UTCZonedDateTime lastUpdateStateDate) {
             this.lastUpdateStateDate = lastUpdateStateDate;
-            return this;
-        }
-
-        public Builder withCreatedAt(final UTCZonedDateTime createdAt) {
-            this.createdAt = createdAt;
             return this;
         }
 
@@ -75,24 +67,18 @@ public final class WorkerDockerContainer implements Worker {
     }
 
     @Override
-    public UTCZonedDateTime createdAt() {
-        return createdAt;
-    }
-
-    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof WorkerDockerContainer)) return false;
         WorkerDockerContainer that = (WorkerDockerContainer) o;
         return Objects.equals(workerId, that.workerId) &&
                 workerStatus == that.workerStatus &&
-                Objects.equals(lastUpdateStateDate, that.lastUpdateStateDate) &&
-                Objects.equals(createdAt, that.createdAt);
+                Objects.equals(lastUpdateStateDate, that.lastUpdateStateDate);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(workerId, workerStatus, lastUpdateStateDate, createdAt);
+        return Objects.hash(workerId, workerStatus, lastUpdateStateDate);
     }
 
     @Override
@@ -101,7 +87,6 @@ public final class WorkerDockerContainer implements Worker {
                 "workerId=" + workerId +
                 ", workerStatus=" + workerStatus +
                 ", lastUpdateStateDate=" + lastUpdateStateDate +
-                ", createdAt=" + createdAt +
                 '}';
     }
 }

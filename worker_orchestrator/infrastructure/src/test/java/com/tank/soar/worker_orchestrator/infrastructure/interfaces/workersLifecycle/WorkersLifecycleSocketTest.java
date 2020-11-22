@@ -1,10 +1,13 @@
-package com.tank.soar.worker_orchestrator.infrastructure.interfaces.logging;
+package com.tank.soar.worker_orchestrator.infrastructure.interfaces.workersLifecycle;
 
 import com.github.dockerjava.api.DockerClient;
+import com.tank.soar.worker_orchestrator.domain.UTCZonedDateTime;
 import com.tank.soar.worker_orchestrator.domain.WorkerId;
 import com.tank.soar.worker_orchestrator.domain.WorkerIdProvider;
 import com.tank.soar.worker_orchestrator.domain.usecase.RunScriptCommand;
 import com.tank.soar.worker_orchestrator.domain.usecase.RunScriptUseCase;
+import com.tank.soar.worker_orchestrator.infrastructure.UTCZonedDateTimeProvider;
+import com.tank.soar.worker_orchestrator.infrastructure.container.DockerLastUpdateStateDateProvider;
 import com.tank.soar.worker_orchestrator.infrastructure.container.DockerWorkerContainerManager;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.agroal.DataSource;
@@ -23,27 +26,27 @@ import java.net.URI;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Month;
 import java.util.Collections;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 
 @QuarkusTest
-public class LoggingFrameSocketTest {
+public class WorkersLifecycleSocketTest {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(LoggingFrameSocketTest.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(WorkersLifecycleSocketTest.class);
 
-    private static final LinkedBlockingDeque<String> JSON_LOG_MESSAGES = new LinkedBlockingDeque<>();
+    private static final LinkedBlockingDeque<String> JSON_WORKER_LIFECYCLE_MESSAGE = new LinkedBlockingDeque<>();
 
-    @TestHTTPResource("/logs/id")
-    URI logsUri;
-
-    @Inject
-    RunScriptUseCase runScriptUseCase;
+    @TestHTTPResource("/workersLifecycle")
+    URI workersLifecycleUri;
 
     @Inject
     @DataSource("workers")
@@ -52,12 +55,26 @@ public class LoggingFrameSocketTest {
     @Inject
     DockerClient dockerClient;
 
+    @Inject
+    RunScriptUseCase runScriptUseCase;
+
     @InjectMock
     WorkerIdProvider workerIdProvider;
+
+    @InjectMock
+    UTCZonedDateTimeProvider utcZonedDateTimeProvider;
+
+    @InjectMock
+    DockerLastUpdateStateDateProvider dockerLastUpdateStateDateProvider;
 
     @BeforeEach
     public void setup() {
         doReturn(new WorkerId("id")).when(workerIdProvider).provideNewWorkerId();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00)).when(utcZonedDateTimeProvider).now();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 01))
+                .doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 02))
+                .doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 03))
+                .when(dockerLastUpdateStateDateProvider).lastUpdateStateDate(any());
     }
 
     @BeforeEach
@@ -86,26 +103,25 @@ public class LoggingFrameSocketTest {
     }
 
     @Test
-    public void should_consume_run_script_logs() throws Exception {
+    public void should_consume_worker_lifecycle() throws Exception {
         // Given
         final RunScriptCommand command = RunScriptCommand.newBuilder().withScript(
-                Stream.of("import sys;",
-                        "import time;",
-                        "print('hello');",
-                        "time.sleep(3);",
-                        "print('bye bye world', file=sys.stderr);")
+                Stream.of("print('hello');")
                         .collect(Collectors.joining())).build();
 
         // When
-        runScriptUseCase.execute(command);
+        // Without executing it in an another thread I we will not be able to have the first message because
+        // we are using the same thread than the client.
+        Executors.newSingleThreadExecutor().submit(() -> runScriptUseCase.execute(command));
 
         // Then
-        try (final Session session = ContainerProvider.getWebSocketContainer().connectToServer(Client.class, logsUri)) {
-            assertThat(JSON_LOG_MESSAGES.poll(10, TimeUnit.SECONDS))
-                    .isEqualTo("{\"workerId\":\"id\",\"logStreamType\":\"STDOUT\",\"content\":\"hello\"}");
-            TimeUnit.SECONDS.sleep(3);
-            assertThat(JSON_LOG_MESSAGES.poll(1, TimeUnit.SECONDS))
-                    .isEqualTo("{\"workerId\":\"id\",\"logStreamType\":\"STDERR\",\"content\":\"bye bye world\"}");
+        try (final Session session = ContainerProvider.getWebSocketContainer().connectToServer(Client.class, workersLifecycleUri)) {
+            assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS))
+                    .isEqualTo("{\"workerId\":\"id\",\"workerStatus\":\"CREATED\",\"lastUpdateStateDate\":\"2020-09-01T10:10:01Z\", \"hasFinished\": \"false\"}");
+            assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS))
+                    .isEqualTo("{\"workerId\":\"id\",\"workerStatus\":\"RUNNING\",\"lastUpdateStateDate\":\"2020-09-01T10:10:02Z\", \"hasFinished\": \"false\"}");
+            assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS))
+                    .isEqualTo("{\"workerId\":\"id\",\"workerStatus\":\"FINISHED\",\"lastUpdateStateDate\":\"2020-09-01T10:10:03Z\", \"hasFinished\": \"true\"}");
         }
     }
 
@@ -118,8 +134,8 @@ public class LoggingFrameSocketTest {
         }
 
         @OnMessage
-        void message(final String jsonLogMessage) {
-            JSON_LOG_MESSAGES.add(jsonLogMessage);
+        public void message(final String jsonWorkerLifecycleMessage) {
+            JSON_WORKER_LIFECYCLE_MESSAGE.add(jsonWorkerLifecycleMessage);
         }
 
     }

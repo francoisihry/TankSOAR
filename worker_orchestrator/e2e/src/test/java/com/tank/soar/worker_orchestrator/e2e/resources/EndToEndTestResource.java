@@ -51,12 +51,14 @@ public class EndToEndTestResource implements QuarkusTestResourceLifecycleManager
                 .withNetworkMode("host")
                 .waitingFor(Wait.forLogMessage(".*End image initialization.*", 1));
         workerOrchestratorContainer.start();
+        System.setProperty("quarkus.http.test-port", applicationPort);// used by URI likes workersLifecycleUri
         System.setProperty("tanksoar.worker_orchestrator.http.port", applicationPort);
         return Collections.emptyMap();
     }
 
     @Override
     public void stop() {
+        System.clearProperty("quarkus.http.test-port");
         System.clearProperty("quarkus.datasource.workers.jdbc.url");
         System.clearProperty("quarkus.datasource.workers.username");
         System.clearProperty("quarkus.datasource.workers.password");

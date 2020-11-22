@@ -47,10 +47,4 @@ public class UseCaseProducers {
         return new RunScriptUseCase(workerContainerManager, workerRepository, workerIdProvider);
     }
 
-    @Produces
-    @ApplicationScoped
-    public ManageWorkersContainersLifeCycleUseCase produceManageWorkersContainersLifeCycleUseCase() {
-        return new ManageWorkersContainersLifeCycleUseCase(workerContainerManager, workerRepository);
-    }
-
 }
