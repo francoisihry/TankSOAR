@@ -147,7 +147,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     }
 
     @Override
-    public List<? extends Worker> listAllContainers() {
+    public List<? extends Worker> listAllWorkers() {
         // TODO should use a global lock
         return dockerClient.listContainersCmd()
                 .withShowAll(true)
@@ -166,7 +166,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     }
 
     @Override
-    public Optional<Worker> findContainer(final WorkerId workerId) {
+    public Optional<Worker> findWorker(final WorkerId workerId) {
         return inspectWorkerContainer(workerId)
                 .map(container -> WorkerDockerContainer.newBuilder()
                         .withWorkerId(workerId)
@@ -176,7 +176,7 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     }
 
     @Override
-    public void deleteContainer(final WorkerId workerId) throws UnknownWorkerException {
+    public void deleteWorker(final WorkerId workerId) throws UnknownWorkerException {
         inspectWorkerContainer(workerId)
                 .map(inspectContainerResponse -> {
                     workerLockMechanism.lock(workerId);

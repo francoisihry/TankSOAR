@@ -18,7 +18,7 @@ public class GetWorkerUseCase implements UseCase<GetWorkerCommand, Worker> {
     @Override
     public Worker execute(final GetWorkerCommand command) throws UseCaseException {
         final WorkerId workerId = command.workerId();
-        return workerContainerManager.findContainer(workerId)
+        return workerContainerManager.findWorker(workerId)
                 .orElseGet(() -> {
                     // In this case it has been deleted because the container state is finished.
                     try {

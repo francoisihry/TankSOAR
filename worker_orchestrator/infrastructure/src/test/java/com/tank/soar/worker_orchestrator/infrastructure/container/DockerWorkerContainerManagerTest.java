@@ -115,7 +115,7 @@ public class DockerWorkerContainerManagerTest {
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "print(\"hello world\")");
 
         // When
-        final List<? extends Worker> workers = dockerWorkerContainerManager.listAllContainers();
+        final List<? extends Worker> workers = dockerWorkerContainerManager.listAllWorkers();
 
         // Then
         assertThat(workers).hasSize(1);
@@ -129,7 +129,7 @@ public class DockerWorkerContainerManagerTest {
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "print(\"hello world\")");
 
         // When
-        final Optional<Worker> worker = dockerWorkerContainerManager.findContainer(new WorkerId("id"));
+        final Optional<Worker> worker = dockerWorkerContainerManager.findWorker(new WorkerId("id"));
 
         // Then
         assertThat(worker.isPresent()).isTrue();
@@ -142,7 +142,7 @@ public class DockerWorkerContainerManagerTest {
         // Given
 
         // When
-        final Optional<Worker> worker = dockerWorkerContainerManager.findContainer(new WorkerId("id"));
+        final Optional<Worker> worker = dockerWorkerContainerManager.findWorker(new WorkerId("id"));
 
         // Then
         assertThat(worker.isPresent()).isFalse();
@@ -155,7 +155,7 @@ public class DockerWorkerContainerManagerTest {
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "print(\"hello world\")");
 
         // When
-        dockerWorkerContainerManager.deleteContainer(new WorkerId("id"));
+        dockerWorkerContainerManager.deleteWorker(new WorkerId("id"));
 
         // Then
         assertThat(dockerClient.listContainersCmd()
@@ -172,7 +172,7 @@ public class DockerWorkerContainerManagerTest {
         // Given
 
         // When && Then
-        assertThatCode(() -> dockerWorkerContainerManager.deleteContainer(new WorkerId("id")))
+        assertThatCode(() -> dockerWorkerContainerManager.deleteWorker(new WorkerId("id")))
                 .isInstanceOf(UnknownWorkerException.class)
                 .hasFieldOrPropertyWithValue("unknownWorkerId", new WorkerId("id"));
     }
@@ -297,7 +297,7 @@ public class DockerWorkerContainerManagerTest {
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "import sys\nprint(\"bye bye world\", file=sys.stderr)");
 
         // When
-        dockerWorkerContainerManager.deleteContainer(new WorkerId("id"));
+        dockerWorkerContainerManager.deleteWorker(new WorkerId("id"));
 
         // then
         inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
@@ -317,7 +317,7 @@ public class DockerWorkerContainerManagerTest {
 
         // When
         try {
-            dockerWorkerContainerManager.deleteContainer(new WorkerId("id"));
+            dockerWorkerContainerManager.deleteWorker(new WorkerId("id"));
             fail("should have failed !");
         } catch (final Exception e) {
 

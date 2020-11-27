@@ -49,7 +49,7 @@ public class ListWorkersUseCaseTest {
         doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 20, 00))
                 .when(workerContainer2).lastUpdateStateDate();
 
-        doReturn(Arrays.asList(workerContainer1, workerContainer2)).when(workerContainerManager).listAllContainers();
+        doReturn(Arrays.asList(workerContainer1, workerContainer2)).when(workerContainerManager).listAllWorkers();
         doReturn(Arrays.asList(worker1, worker2)).when(workerRepository).listAllWorkers();
 
         // When
@@ -73,7 +73,7 @@ public class ListWorkersUseCaseTest {
         doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 20, 00))
                 .when(workerContainer2).lastUpdateStateDate();
 
-        doReturn(Arrays.asList(workerContainer2)).when(workerContainerManager).listAllContainers();
+        doReturn(Arrays.asList(workerContainer2)).when(workerContainerManager).listAllWorkers();
         doReturn(Arrays.asList(worker1, worker2)).when(workerRepository).listAllWorkers();
 
         // When

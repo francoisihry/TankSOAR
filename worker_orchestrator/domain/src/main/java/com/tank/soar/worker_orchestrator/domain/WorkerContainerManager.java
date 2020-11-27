@@ -7,11 +7,11 @@ public interface WorkerContainerManager {
 
     Worker runScript(WorkerId workerId, String script) throws UnableToRunScriptException;
 
-    List<? extends Worker> listAllContainers();
+    List<? extends Worker> listAllWorkers();
 
-    Optional<Worker> findContainer(WorkerId workerId);
+    Optional<Worker> findWorker(WorkerId workerId);
 
-    void deleteContainer(WorkerId workerId) throws UnknownWorkerException;
+    void deleteWorker(WorkerId workerId) throws UnknownWorkerException;
 
     Optional<List<? extends LogStream>> findLog(WorkerId workerId, Boolean stdOut, Boolean stdErr) throws UnknownWorkerException;
 
