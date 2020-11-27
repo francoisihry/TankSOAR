@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Month;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
@@ -18,14 +20,17 @@ public class RunScriptUseCaseTest {
     private WorkerContainerManager workerContainerManager;
     private WorkerRepository workerRepository;
     private WorkerIdProvider workerIdProvider;
+    private UTCZonedDateTimeProvider utcZonedDateTimeProvider;
 
     @BeforeEach
     public void setup() {
         workerContainerManager = mock(WorkerContainerManager.class);
         workerRepository = mock(WorkerRepository.class);
         workerIdProvider = mock(WorkerIdProvider.class);
+        utcZonedDateTimeProvider = mock(UTCZonedDateTimeProvider.class);
         doReturn(new WorkerId("id")).when(workerIdProvider).provideNewWorkerId();
-        runScriptUseCase = new RunScriptUseCase(workerContainerManager, workerRepository, workerIdProvider);
+        runScriptUseCase = new RunScriptUseCase(workerContainerManager, workerRepository,
+                workerIdProvider, utcZonedDateTimeProvider);
     }
 
     @Test
@@ -46,12 +51,15 @@ public class RunScriptUseCaseTest {
         // Given
         final Worker worker = mock(Worker.class);
         doReturn(worker).when(workerContainerManager).runScript(new WorkerId("id"),"script");
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .when(utcZonedDateTimeProvider).now();
 
         // When
         runScriptUseCase.execute(RunScriptCommand.newBuilder().withScript("script").build());
 
         // Then
-        verify(workerRepository, times(1)).createWorker(eq(new WorkerId("id")), eq("script"), any());
+        verify(workerRepository, times(1)).createWorker(new WorkerId("id"),"script",
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
     }
 
     @Test

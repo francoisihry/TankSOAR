@@ -6,7 +6,7 @@ import com.tank.soar.worker_orchestrator.domain.WorkerId;
 import com.tank.soar.worker_orchestrator.domain.WorkerIdProvider;
 import com.tank.soar.worker_orchestrator.domain.usecase.RunScriptCommand;
 import com.tank.soar.worker_orchestrator.domain.usecase.RunScriptUseCase;
-import com.tank.soar.worker_orchestrator.infrastructure.UTCZonedDateTimeProvider;
+import com.tank.soar.worker_orchestrator.domain.UTCZonedDateTimeProvider;
 import com.tank.soar.worker_orchestrator.infrastructure.container.DockerLastUpdateStateDateProvider;
 import com.tank.soar.worker_orchestrator.infrastructure.container.DockerWorkerContainerManager;
 import io.agroal.api.AgroalDataSource;
@@ -28,7 +28,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Month;
 import java.util.Collections;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -70,7 +69,7 @@ public class WorkersLifecycleSocketTest {
     @BeforeEach
     public void setup() {
         doReturn(new WorkerId("id")).when(workerIdProvider).provideNewWorkerId();
-        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00)).when(utcZonedDateTimeProvider).now();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)).when(utcZonedDateTimeProvider).now();
         doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 01))
                 .doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 02))
                 .doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 03))
@@ -96,7 +95,7 @@ public class WorkersLifecycleSocketTest {
         try (final Connection con = workerDataSource.getConnection();
              final Statement stmt = con.createStatement()) {
             stmt.executeUpdate("TRUNCATE TABLE WORKER");
-            stmt.executeUpdate("TRUNCATE TABLE DOCKER_STATE_SNAPSHOT");
+            stmt.executeUpdate("TRUNCATE TABLE WORKER_EVENT");
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -109,13 +108,13 @@ public class WorkersLifecycleSocketTest {
                 Stream.of("print('hello');")
                         .collect(Collectors.joining())).build();
 
-        // When
-        // Without executing it in an another thread I we will not be able to have the first message because
-        // we are using the same thread than the client.
-        Executors.newSingleThreadExecutor().submit(() -> runScriptUseCase.execute(command));
-
-        // Then
         try (final Session session = ContainerProvider.getWebSocketContainer().connectToServer(Client.class, workersLifecycleUri)) {
+            // When
+            runScriptUseCase.execute(command);
+
+            // Then
+            assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS))
+                    .isEqualTo("{\"workerId\":\"id\",\"workerStatus\":\"CREATION_REQUESTED\",\"lastUpdateStateDate\":\"2020-09-01T10:10Z\", \"hasFinished\": \"false\"}");
             assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS))
                     .isEqualTo("{\"workerId\":\"id\",\"workerStatus\":\"CREATED\",\"lastUpdateStateDate\":\"2020-09-01T10:10:01Z\", \"hasFinished\": \"false\"}");
             assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS))
@@ -135,6 +134,7 @@ public class WorkersLifecycleSocketTest {
 
         @OnMessage
         public void message(final String jsonWorkerLifecycleMessage) {
+            LOGGER.info(String.format("Received message '%s'", jsonWorkerLifecycleMessage));
             JSON_WORKER_LIFECYCLE_MESSAGE.add(jsonWorkerLifecycleMessage);
         }
 

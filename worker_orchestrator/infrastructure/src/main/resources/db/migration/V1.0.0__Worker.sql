@@ -1,16 +1,18 @@
 CREATE TABLE public.WORKER (
   workerId character varying(255) NOT NULL,
   script text NOT NULL,
-  createdAt timestamp without time zone NOT NULL,
-  zoneOffset character varying(255) NOT NULL,
   CONSTRAINT worker_pkey PRIMARY KEY (workerId)
 );
 
-CREATE TABLE public.DOCKER_STATE_SNAPSHOT (
+CREATE TABLE public.WORKER_EVENT (
   workerId character varying(255) NOT NULL,
-  container jsonb NOT NULL,
-  logStreams jsonb,
-  snapshotDate timestamp without time zone NOT NULL,
+  eventType character varying(255) NOT NULL,-- clé : USER, DOCKER
+  eventDate timestamp without time zone NOT NULL,
   zoneOffset character varying(255) NOT NULL,
-  CONSTRAINT docker_state_snapshot_pkey PRIMARY KEY (workerId, snapshotDate)
+--  container
+  container jsonb,
+  logStreams jsonb,
+--  action manuel
+  userEventType character varying(255),-- CREATION_REQUESTED
+  CONSTRAINT docker_state_snapshot_pkey PRIMARY KEY (workerId, eventDate)
 );

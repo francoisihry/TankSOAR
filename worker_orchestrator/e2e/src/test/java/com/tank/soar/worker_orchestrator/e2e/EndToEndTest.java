@@ -104,7 +104,7 @@ public class EndToEndTest {
         try (final Connection con = workerDataSource.getConnection();
              final Statement stmt = con.createStatement()) {
             stmt.executeUpdate("TRUNCATE TABLE WORKER");
-            stmt.executeUpdate("TRUNCATE TABLE DOCKER_STATE_SNAPSHOT");
+            stmt.executeUpdate("TRUNCATE TABLE WORKER_EVENT");
         } catch (final SQLException e) {
             throw new RuntimeException(e);
         }
@@ -148,18 +148,19 @@ public class EndToEndTest {
                 .statusCode(200)
                 .extract().path("workerId");
 
+        assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS)).contains(workerId).contains("CREATION_REQUESTED");
         assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS)).contains(workerId).contains("CREATED");
         assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS)).contains(workerId).contains("RUNNING");
         assertThat(JSON_WORKER_LIFECYCLE_MESSAGE.poll(10, TimeUnit.SECONDS)).contains(workerId).contains("FINISHED");
 
         try (final Connection con = workerDataSource.getConnection();
-             final Statement stmt = con.createStatement()) {
-            final ResultSet countWorkerRS = stmt.executeQuery("SELECT COUNT(*) FROM WORKER");
+             final Statement stmt = con.createStatement();
+             final ResultSet countWorkerRS = stmt.executeQuery("SELECT COUNT(*) FROM WORKER");
+             final ResultSet countWorkerEventsRS = stmt.executeQuery("SELECT COUNT(*) FROM WORKER_EVENT")) {
             countWorkerRS.next();
             assertThat(countWorkerRS.getLong(1)).isEqualTo(1l);
-            final ResultSet countDockerStateSnapshotRS = stmt.executeQuery("SELECT COUNT(*) FROM DOCKER_STATE_SNAPSHOT");
-            countDockerStateSnapshotRS.next();
-            assertThat(countDockerStateSnapshotRS.getLong(1)).isEqualTo(3l);
+            countWorkerEventsRS.next();
+            assertThat(countWorkerEventsRS.getLong(1)).isEqualTo(4l);
         }
         // ici le log !!! trop compliqué. Je dois connaitre l'id avant pour l'injecter dans l'url ...
 
@@ -257,6 +258,7 @@ public class EndToEndTest {
 
         @Override
         public void onMessage(final String jsonWorkerLifecycleMessage) {
+            LOGGER.info(String.format("Received message '%s'", jsonWorkerLifecycleMessage));
             JSON_WORKER_LIFECYCLE_MESSAGE.add(jsonWorkerLifecycleMessage);
         }
 

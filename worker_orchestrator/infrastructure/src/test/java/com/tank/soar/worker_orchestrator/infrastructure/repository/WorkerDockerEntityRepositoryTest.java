@@ -11,6 +11,7 @@ import io.quarkus.agroal.DataSource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectSpy;
+import org.apache.commons.lang3.Validate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
@@ -19,10 +20,7 @@ import org.mockito.InOrder;
 
 import javax.enterprise.event.Event;
 import javax.inject.Inject;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.util.Arrays;
@@ -52,7 +50,7 @@ public class WorkerDockerEntityRepositoryTest {
         try (final Connection con = workerDataSource.getConnection();
              final Statement stmt = con.createStatement()) {
             stmt.executeUpdate("TRUNCATE TABLE WORKER");
-            stmt.executeUpdate("TRUNCATE TABLE DOCKER_STATE_SNAPSHOT");
+            stmt.executeUpdate("TRUNCATE TABLE WORKER_EVENT");
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -65,7 +63,7 @@ public class WorkerDockerEntityRepositoryTest {
             try (final Connection con = workerDataSource.getConnection();
                  final Statement stmt = con.createStatement();
                  final ResultSet rsWorker = stmt.executeQuery("SELECT * FROM WORKER");
-                 final ResultSet rsDockerStateSnapshot = stmt.executeQuery("SELECT * FROM DOCKER_STATE_SNAPSHOT")) {
+                 final ResultSet rsDockerStateSnapshot = stmt.executeQuery("SELECT * FROM WORKER_EVENT")) {
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -84,14 +82,57 @@ public class WorkerDockerEntityRepositoryTest {
         // Then
         try (final Connection con = workerDataSource.getConnection();
              final Statement stmt = con.createStatement();
-             final ResultSet rsWorker = stmt.executeQuery("SELECT * FROM WORKER")) {
+             final ResultSet rsWorker = stmt.executeQuery("SELECT * FROM WORKER");
+             final ResultSet rsWorkerEvent = stmt.executeQuery("SELECT * FROM WORKER_EVENT")) {
 
             rsWorker.next();
             assertThat(rsWorker.getString("workerId")).isEqualTo("id");
             assertThat(rsWorker.getString("script")).isEqualTo("print(\"hello world\")");
-            assertThat(rsWorker.getObject("createdAt", LocalDateTime.class))
+
+            rsWorkerEvent.next();
+            assertThat(rsWorkerEvent.getString("workerId")).isEqualTo("id");
+            assertThat(rsWorkerEvent.getString("eventType")).isEqualTo("USER");
+            assertThat(rsWorkerEvent.getObject("eventDate", LocalDateTime.class))
                     .isEqualTo(LocalDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
-            assertThat(rsWorker.getString("zoneOffset")).isEqualTo("Z");
+            assertThat(rsWorkerEvent.getString("zoneOffset")).isEqualTo("Z");
+            assertThat(rsWorkerEvent.getString("container")).isNull();
+            assertThat(rsWorkerEvent.getString("logStreams")).isNull();
+            assertThat(rsWorkerEvent.getString("userEventType")).isEqualTo("CREATION_REQUESTED");
+        }
+    }
+
+    @Test
+    @Order(3)
+    public void should_create_worker_rollback_worker_when_worker_event_already_exist() throws SQLException {
+        // Given
+        final WorkerId workerId = new WorkerId("id");
+        final UTCZonedDateTime utcZonedDateTime = UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00);
+        try (final Connection con = workerDataSource.getConnection();
+             final PreparedStatement createUserWorkerEventPreparedStatement = con.prepareStatement(WorkerDockerEntityRepository.CREATE_USER_WORKER_EVENT)) {
+            createUserWorkerEventPreparedStatement.setString(1, workerId.id());
+            createUserWorkerEventPreparedStatement.setString(2, "CREATION_REQUESTED");
+            createUserWorkerEventPreparedStatement.setObject(3, utcZonedDateTime.localDateTime());
+            createUserWorkerEventPreparedStatement.setString(4, utcZonedDateTime.zoneOffset().getId());
+            Validate.validState(createUserWorkerEventPreparedStatement.executeUpdate() == 1);
+        }
+
+        // When
+        try {
+            workerDockerEntityRepository.createWorker(workerId, "print(\"hello world\")", utcZonedDateTime);
+            fail("should have failed !");
+        } catch (final Exception e) {
+
+        }
+
+        // Then
+        try (final Connection con = workerDataSource.getConnection();
+             final Statement stmt = con.createStatement();
+             final ResultSet countWorkerRS = stmt.executeQuery("SELECT COUNT(*) FROM WORKER");
+             final ResultSet countWorkerEventsRS = stmt.executeQuery("SELECT COUNT(*) FROM WORKER_EVENT")) {
+            countWorkerRS.next();
+            assertThat(countWorkerRS.getLong(1)).isEqualTo(0l);
+            countWorkerEventsRS.next();
+            assertThat(countWorkerEventsRS.getLong(1)).isEqualTo(1l);// I've got one in my given
         }
     }
 
@@ -110,8 +151,14 @@ public class WorkerDockerEntityRepositoryTest {
         assertThat(workers.get(0)).isEqualTo(WorkerDockerEntity
                 .newBuilder()
                 .withWorkerId(new WorkerId("id"))
-                .withCreatedAt(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
-                .withWorkerSnapshotDockerEntities(Collections.emptyList())
+                .withWorkerEventEntities(Collections.singletonList(
+                        new WorkerEventEntity(
+                                new WorkerId("id"),
+                                EventType.USER,
+                                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                                null,
+                                UserEventType.CREATION_REQUESTED
+                        )))
                 .build());
     }
 
@@ -129,8 +176,14 @@ public class WorkerDockerEntityRepositoryTest {
         assertThat(worker).isEqualTo(WorkerDockerEntity
                 .newBuilder()
                 .withWorkerId(new WorkerId("id"))
-                .withCreatedAt(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
-                .withWorkerSnapshotDockerEntities(Collections.emptyList())
+                .withWorkerEventEntities(Collections.singletonList(
+                        new WorkerEventEntity(
+                                new WorkerId("id"),
+                                EventType.USER,
+                                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                                null,
+                                UserEventType.CREATION_REQUESTED
+                        )))
                 .build());
     }
 
@@ -198,7 +251,7 @@ public class WorkerDockerEntityRepositoryTest {
     }
 
     @Test
-    @Order(9)
+    @Order(11)
     public void should_get_std_out_and_std_err_logs_in_order() throws Exception {
         // Given
         givenWorkerLog();
@@ -216,7 +269,7 @@ public class WorkerDockerEntityRepositoryTest {
     Event<DockerStateChanged> dockerStateChangedEvent;
 
     @Test
-    @Order(10)
+    @Order(12)
     public void should_store_docker_state_on_docker_state_changed() throws SQLException {
         // Given
 
@@ -241,18 +294,20 @@ public class WorkerDockerEntityRepositoryTest {
         // Then
         try (final Connection con = workerDataSource.getConnection();
              final Statement stmt = con.createStatement()) {
-            final ResultSet resultSet = stmt.executeQuery("SELECT workerId, container, logStreams, snapshotDate, zoneOffset FROM DOCKER_STATE_SNAPSHOT");
+            final ResultSet resultSet = stmt.executeQuery("SELECT workerId, eventType, eventDate, zoneOffset, container, logStreams, userEventType FROM WORKER_EVENT");
             assertThat(resultSet.next()).isTrue();
             assertThat(resultSet.getString("workerId")).isEqualTo("id");
+            assertThat(resultSet.getString("eventType")).isEqualTo(EventType.DOCKER.name());
+            assertThat(resultSet.getString("eventDate")).isEqualTo("2020-09-01 10:00:00");
+            assertThat(resultSet.getString("zoneOffset")).isEqualTo("Z");
             assertThat(resultSet.getString("container")).isEqualTo("{\"Id\": null, \"Args\": null, \"Name\": null, \"Node\": null, \"Path\": null, \"Image\": null, \"State\": null, \"Config\": null, \"Driver\": null, \"Mounts\": null, \"Created\": null, \"ExecIDs\": null, \"LogPath\": null, \"Volumes\": null, \"Platform\": null, \"HostsPath\": null, \"VolumesRW\": null, \"ExecDriver\": null, \"HostConfig\": null, \"MountLabel\": null, \"SizeRootFs\": null, \"GraphDriver\": null, \"HostnamePath\": null, \"ProcessLabel\": null, \"RestartCount\": null, \"ResolvConfPath\": null, \"NetworkSettings\": null}");
             assertThat(resultSet.getString("logStreams")).isEqualTo("[{\"content\": \"stdOut\", \"workerId\": \"id\", \"logStreamType\": \"STDOUT\"}, {\"content\": \"stdErr\", \"workerId\": \"id\", \"logStreamType\": \"STDERR\"}]");
-            assertThat(resultSet.getString("snapshotDate")).isEqualTo("2020-09-01 10:00:00");
-            assertThat(resultSet.getString("zoneOffset")).isEqualTo("Z");
+            assertThat(resultSet.getString("userEventType")).isNull();
         }
     }
 
     @Test
-    @Order(11)
+    @Order(13)
     public void should_store_docker_state_use_locking_mechanism() throws SQLException {
         // Given
         final InOrder inOrder = inOrder(workerLockMechanism);
@@ -271,7 +326,7 @@ public class WorkerDockerEntityRepositoryTest {
     }
 
     @Test
-    @Order(12)
+    @Order(14)
     public void should_store_docker_state_be_unlocked_when_exception_is_thrown() {
         // Given
         final DockerStateChanged dockerStateChanged = DockerStateChanged.newBuilder()
@@ -312,13 +367,13 @@ public class WorkerDockerEntityRepositoryTest {
         dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
                 .withWorkerId(new WorkerId("id"))
                 .withContainer(new InspectContainerResponse())
-                .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
+                .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 01))
                 .withStdResponses(Arrays.asList(stdResponseStdout, stdResponseStderr))
                 .build());
     }
 
     @Test
-    @Order(14)
+    @Order(15)
     public void should_create_worker_use_locking_mechanism() {
         // Given
         final InOrder inOrder = inOrder(workerLockMechanism);
@@ -334,7 +389,7 @@ public class WorkerDockerEntityRepositoryTest {
     }
 
     @Test
-    @Order(15)
+    @Order(16)
     public void should_create_worker_be_unlocked_when_exception_is_thrown() {
         // Given
 

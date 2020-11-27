@@ -79,7 +79,7 @@ public class LoggingFrameSocketTest {
         try (final Connection con = workerDataSource.getConnection();
              final Statement stmt = con.createStatement()) {
             stmt.executeUpdate("TRUNCATE TABLE WORKER");
-            stmt.executeUpdate("TRUNCATE TABLE DOCKER_STATE_SNAPSHOT");
+            stmt.executeUpdate("TRUNCATE TABLE WORKER_EVENT");
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }

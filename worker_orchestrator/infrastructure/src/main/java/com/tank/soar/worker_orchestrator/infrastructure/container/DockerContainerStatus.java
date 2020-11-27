@@ -3,7 +3,7 @@ package com.tank.soar.worker_orchestrator.infrastructure.container;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.tank.soar.worker_orchestrator.domain.UTCZonedDateTime;
 import com.tank.soar.worker_orchestrator.domain.WorkerStatus;
-import com.tank.soar.worker_orchestrator.infrastructure.UTCZonedDateTimeProvider;
+import com.tank.soar.worker_orchestrator.domain.UTCZonedDateTimeProvider;
 
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;

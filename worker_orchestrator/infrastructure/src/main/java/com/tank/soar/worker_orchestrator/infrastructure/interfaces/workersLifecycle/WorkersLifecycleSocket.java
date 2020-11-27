@@ -4,6 +4,8 @@ import com.tank.soar.worker_orchestrator.domain.Worker;
 import com.tank.soar.worker_orchestrator.infrastructure.container.WorkerStateChanged;
 import com.tank.soar.worker_orchestrator.infrastructure.interfaces.WorkerDTO;
 import io.quarkus.runtime.Startup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.event.Observes;
@@ -14,6 +16,8 @@ import javax.websocket.Session;
 import javax.websocket.server.ServerEndpoint;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @ServerEndpoint(value = "/workersLifecycle",
         encoders = { WorkerDTOEncoder.class })
@@ -21,7 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Startup
 public class WorkersLifecycleSocket {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(WorkersLifecycleSocket.class);
+
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
+
+    private final ExecutorService workerStateChangedExecutorService = Executors.newSingleThreadExecutor();
 
     @OnOpen
     public void onOpen(final Session session) {
@@ -39,6 +47,7 @@ public class WorkersLifecycleSocket {
     }
 
     private void broadcastToEveryone(final Worker worker) {
+        LOGGER.info(String.format("broadcasting worker state changed '%s', '%d' sessions to notify", worker.toString(), sessions.size()));
         sessions.values().forEach(session ->
             session.getAsyncRemote()
                     .sendObject(new WorkerDTO(worker), result ->  {
@@ -50,7 +59,7 @@ public class WorkersLifecycleSocket {
     }
 
     void onWorkerStateChanged(@Observes final WorkerStateChanged workerStateChanged) {
-        broadcastToEveryone(workerStateChanged.worker());
+        workerStateChangedExecutorService.submit(() -> broadcastToEveryone(workerStateChanged.worker()));
     }
 
 // TODO  created, deleted, running, stopped...
