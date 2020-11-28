@@ -14,5 +14,5 @@ CREATE TABLE public.WORKER_EVENT (
   logStreams jsonb,
 --  action manuel
   userEventType character varying(255),-- CREATION_REQUESTED
-  CONSTRAINT docker_state_snapshot_pkey PRIMARY KEY (workerId, eventDate)
+  CONSTRAINT worker_event_pkey PRIMARY KEY (workerId, eventDate)
 );
