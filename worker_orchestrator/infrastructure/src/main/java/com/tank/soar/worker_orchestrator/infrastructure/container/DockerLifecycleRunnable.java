@@ -41,6 +41,10 @@ public final class DockerLifecycleRunnable implements Runnable {
         try {
             startContainer();
             waitForContainerEndOfLife();
+        } catch (final NotFoundException notFoundException) {
+            // in this case the container has been removed... Expected as the user should be able to remove it
+        } catch (final ConflictException conflictException) {
+            // 409: can not get logs from container which is dead or marked for removal
         } catch (final InterruptedException e) {
             e.printStackTrace();
         }
@@ -52,6 +56,8 @@ public final class DockerLifecycleRunnable implements Runnable {
         try {
             dockerClient.startContainerCmd(workerId.id()).exec();
             container = dockerClient.inspectContainerCmd(workerId.id()).exec();
+        } catch (final Exception exception) {
+            throw exception;
         } finally {
             workerLockMechanism.unlock(workerId);
         }
@@ -65,14 +71,14 @@ public final class DockerLifecycleRunnable implements Runnable {
     }
 
     private void waitForContainerEndOfLife() throws InterruptedException {
-        final WaitContainerResultCallback waitContainerResultCallback = dockerClient.waitContainerCmd(workerId.id()).start();
+        final WaitContainerResultCallback waitContainerResultCallback = dockerClient.waitContainerCmd(workerId.id())
+                .start();// We can have a 404 error if the container is deleted by an another call. It is expected
+                         // The exception cannot be caught as it is open in an another thread.
         waitContainerResultCallback.awaitCompletion();
         workerLockMechanism.lock(workerId);
-        final InspectContainerResponse container;
-        final LoggingResultCallbackAdapter loggingResultCallbackAdapter;
         try {
-            container = dockerClient.inspectContainerCmd(workerId.id()).exec();
-            loggingResultCallbackAdapter = new LoggingResultCallbackAdapter(workerId);
+            final InspectContainerResponse container = dockerClient.inspectContainerCmd(workerId.id()).exec();
+            final LoggingResultCallbackAdapter loggingResultCallbackAdapter = new LoggingResultCallbackAdapter(workerId);
             dockerClient
                     .logContainerCmd(container.getId())
                     .withStdOut(true)
@@ -88,10 +94,8 @@ public final class DockerLifecycleRunnable implements Runnable {
                     .withDockerStateChangedDate(dockerStateChangedDate)
                     .withStdResponses(loggingResultCallbackAdapter.getStdResponses())
                     .build());
-        } catch (final NotFoundException notFoundException) {
-            // in this case the container has been removed... Expected as the user should be able to remove it
-        } catch (final ConflictException conflictException) {
-            // 409: can not get logs from container which is dead or marked for removal
+        } catch (final Exception exception) {
+            throw exception;
         } finally {
             workerLockMechanism.unlock(workerId);
         }
