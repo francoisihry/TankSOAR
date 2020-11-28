@@ -1,9 +1,13 @@
 package com.tank.soar.worker_orchestrator.infrastructure.repository;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.tank.soar.worker_orchestrator.domain.*;
 import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
-import com.tank.soar.worker_orchestrator.infrastructure.container.DockerStateChanged;
+import com.tank.soar.worker_orchestrator.infrastructure.container.NewWorkerDockerEvent;
 import com.tank.soar.worker_orchestrator.infrastructure.container.StdResponse;
 import com.tank.soar.worker_orchestrator.resources.PostgresqlTestResource;
 import io.agroal.api.AgroalDataSource;
@@ -17,6 +21,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompareMode;
 
 import javax.enterprise.event.Event;
 import javax.inject.Inject;
@@ -26,6 +32,7 @@ import java.time.Month;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Scanner;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -266,17 +273,22 @@ public class WorkerDockerEntityRepositoryTest {
     }
 
     @Inject
-    Event<DockerStateChanged> dockerStateChangedEvent;
+    Event<NewWorkerDockerEvent> dockerStateChangedEvent;
 
     @Test
     @Order(12)
-    public void should_store_docker_state_on_docker_state_changed() throws SQLException {
+    public void should_store_docker_state_on_docker_state_changed() throws Exception {
         // Given
+        final InspectContainerResponse inspectContainerResponse = new ObjectMapper()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)// Some properties are not supported by docker java api
+                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                .readValue(this.getClass().getResourceAsStream("/given_container_inspect.json"),
+                        new TypeReference<InspectContainerResponse>() {});
 
         // When
-        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+        dockerStateChangedEvent.fire(NewWorkerDockerEvent.newBuilder()
                 .withWorkerId(new WorkerId("id"))
-                .withContainer(new InspectContainerResponse())
+                .withContainer(inspectContainerResponse)
                 .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
                 .withStdResponses(Arrays.asList(
                         StdResponse.newBuilder()
@@ -300,7 +312,8 @@ public class WorkerDockerEntityRepositoryTest {
             assertThat(resultSet.getString("eventType")).isEqualTo(EventType.DOCKER.name());
             assertThat(resultSet.getString("eventDate")).isEqualTo("2020-09-01 10:00:00");
             assertThat(resultSet.getString("zoneOffset")).isEqualTo("Z");
-            assertThat(resultSet.getString("container")).isEqualTo("{\"Id\": null, \"Args\": null, \"Name\": null, \"Node\": null, \"Path\": null, \"Image\": null, \"State\": null, \"Config\": null, \"Driver\": null, \"Mounts\": null, \"Created\": null, \"ExecIDs\": null, \"LogPath\": null, \"Volumes\": null, \"Platform\": null, \"HostsPath\": null, \"VolumesRW\": null, \"ExecDriver\": null, \"HostConfig\": null, \"MountLabel\": null, \"SizeRootFs\": null, \"GraphDriver\": null, \"HostnamePath\": null, \"ProcessLabel\": null, \"RestartCount\": null, \"ResolvConfPath\": null, \"NetworkSettings\": null}");
+            final String expectedContainer = new Scanner(getClass().getResourceAsStream("/expected_container_inspect.json")).useDelimiter("\\A").next();
+            JSONAssert.assertEquals(expectedContainer, resultSet.getString("container"), JSONCompareMode.NON_EXTENSIBLE);
             assertThat(resultSet.getString("logStreams")).isEqualTo("[{\"content\": \"stdOut\", \"workerId\": \"id\", \"logStreamType\": \"STDOUT\"}, {\"content\": \"stdErr\", \"workerId\": \"id\", \"logStreamType\": \"STDERR\"}]");
             assertThat(resultSet.getString("userEventType")).isNull();
         }
@@ -308,14 +321,19 @@ public class WorkerDockerEntityRepositoryTest {
 
     @Test
     @Order(13)
-    public void should_store_docker_state_use_locking_mechanism() throws SQLException {
+    public void should_store_docker_state_use_locking_mechanism() throws Exception {
         // Given
+        final InspectContainerResponse inspectContainerResponse = new ObjectMapper()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                .readValue(this.getClass().getResourceAsStream("/given_container_inspect.json"),
+                        new TypeReference<InspectContainerResponse>() {});
         final InOrder inOrder = inOrder(workerLockMechanism);
 
         // When
-        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+        dockerStateChangedEvent.fire(NewWorkerDockerEvent.newBuilder()
                 .withWorkerId(new WorkerId("id"))
-                .withContainer(new InspectContainerResponse())
+                .withContainer(inspectContainerResponse)
                 .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
                 .withStdResponses(Collections.emptyList())
                 .build());
@@ -327,20 +345,25 @@ public class WorkerDockerEntityRepositoryTest {
 
     @Test
     @Order(14)
-    public void should_store_docker_state_be_unlocked_when_exception_is_thrown() {
+    public void should_store_docker_state_be_unlocked_when_exception_is_thrown() throws Exception {
         // Given
-        final DockerStateChanged dockerStateChanged = DockerStateChanged.newBuilder()
+        final InspectContainerResponse inspectContainerResponse = new ObjectMapper()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                .readValue(this.getClass().getResourceAsStream("/given_container_inspect.json"),
+                        new TypeReference<InspectContainerResponse>() {});
+        final NewWorkerDockerEvent newWorkerDockerEvent = NewWorkerDockerEvent.newBuilder()
                 .withWorkerId(new WorkerId("id"))
-                .withContainer(new InspectContainerResponse())
+                .withContainer(inspectContainerResponse)
                 .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00))
                 .withStdResponses(Collections.emptyList())
                 .build();
-        dockerStateChangedEvent.fire(dockerStateChanged);
+        dockerStateChangedEvent.fire(newWorkerDockerEvent);
         reset(workerLockMechanism);
 
         // When
         try {
-            dockerStateChangedEvent.fire(dockerStateChanged);
+            dockerStateChangedEvent.fire(newWorkerDockerEvent);
             fail("should have failed ! due to the primary key on workerId and snapshotDate");
         } catch (final Exception e) {
 
@@ -350,25 +373,31 @@ public class WorkerDockerEntityRepositoryTest {
         verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
     }
 
-    private void givenWorkerLog() {
+    private void givenWorkerLog() throws Exception {
         workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
                 UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
 
-        final StdResponse stdResponseStdout = StdResponse.newBuilder()
+        final InspectContainerResponse inspectContainerResponse = new ObjectMapper()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+                .readValue(this.getClass().getResourceAsStream("/given_container_inspect.json"),
+                        new TypeReference<InspectContainerResponse>() {});
+
+        dockerStateChangedEvent.fire(NewWorkerDockerEvent.newBuilder()
                 .withWorkerId(new WorkerId("id"))
-                .withLogStreamType(LogStreamType.STDOUT)
-                .withContent("stdOut")
-                .build();
-        final StdResponse stdResponseStderr = StdResponse.newBuilder()
-                .withWorkerId(new WorkerId("id"))
-                .withLogStreamType(LogStreamType.STDERR)
-                .withContent("stdErr")
-                .build();
-        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
-                .withWorkerId(new WorkerId("id"))
-                .withContainer(new InspectContainerResponse())
-                .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 01))
-                .withStdResponses(Arrays.asList(stdResponseStdout, stdResponseStderr))
+                .withContainer(inspectContainerResponse)
+                .withDockerStateChangedDate(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
+                .withStdResponses(Arrays.asList(
+                        StdResponse.newBuilder()
+                                .withWorkerId(new WorkerId("id"))
+                                .withLogStreamType(LogStreamType.STDOUT)
+                                .withContent("stdOut")
+                                .build(),
+                        StdResponse.newBuilder()
+                                .withWorkerId(new WorkerId("id"))
+                                .withLogStreamType(LogStreamType.STDERR)
+                                .withContent("stdErr")
+                                .build()))
                 .build());
     }
 

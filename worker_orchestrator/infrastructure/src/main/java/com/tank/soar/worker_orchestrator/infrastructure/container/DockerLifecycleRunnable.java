@@ -20,21 +20,18 @@ public final class DockerLifecycleRunnable implements Runnable {
 
     private final WorkerId workerId;
     private final DockerClient dockerClient;
-    private final Event<DockerStateChanged> dockerStateChangedEvent;
-    private final Event<WorkerStateChanged> workerStateChangedEvent;
+    private final Event<NewWorkerDockerEvent> newWorkerDockerEvent;
     private final DockerLastUpdateStateDateProvider dockerLastUpdateStateDateProvider;
     private final WorkerLockMechanism workerLockMechanism;
 
     public DockerLifecycleRunnable(final WorkerId workerId,
                                    final DockerClient dockerClient,
-                                   final Event<DockerStateChanged> dockerStateChangedEvent,
-                                   final Event<WorkerStateChanged> workerStateChangedEvent,
+                                   final Event<NewWorkerDockerEvent> newWorkerDockerEvent,
                                    final DockerLastUpdateStateDateProvider dockerLastUpdateStateDateProvider,
                                    final WorkerLockMechanism workerLockMechanism) {
         this.workerId = Objects.requireNonNull(workerId);
         this.dockerClient = Objects.requireNonNull(dockerClient);
-        this.dockerStateChangedEvent = Objects.requireNonNull(dockerStateChangedEvent);
-        this.workerStateChangedEvent = Objects.requireNonNull(workerStateChangedEvent);
+        this.newWorkerDockerEvent = Objects.requireNonNull(newWorkerDockerEvent);
         this.dockerLastUpdateStateDateProvider = Objects.requireNonNull(dockerLastUpdateStateDateProvider);
         this.workerLockMechanism = Objects.requireNonNull(workerLockMechanism);
     }
@@ -59,20 +56,12 @@ public final class DockerLifecycleRunnable implements Runnable {
             workerLockMechanism.unlock(workerId);
         }
         final UTCZonedDateTime dockerStateChangedDate = dockerLastUpdateStateDateProvider.lastUpdateStateDate(container);
-        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+        newWorkerDockerEvent.fire(NewWorkerDockerEvent.newBuilder()
                 .withWorkerId(workerId)
                 .withContainer(container)
                 .withDockerStateChangedDate(dockerStateChangedDate)
                 .withStdResponses(Collections.emptyList())
                 .build());
-        final WorkerDockerContainer workerDockerContainer = WorkerDockerContainer.newBuilder()
-                .withWorkerId(workerId)
-                .withWorkerStatus(DockerContainerStatus
-                        .fromDockerStatus(container.getState().getStatus())
-                        .toWorkerStatus())
-                .withLastUpdateStateDate(dockerStateChangedDate)
-                .build();
-        workerStateChangedEvent.fire(new WorkerStateChanged(workerDockerContainer));
     }
 
     private void waitForContainerEndOfLife() throws InterruptedException {
@@ -93,20 +82,12 @@ public final class DockerLifecycleRunnable implements Runnable {
                     .exec(loggingResultCallbackAdapter);
             loggingResultCallbackAdapter.awaitCompletion();
             final UTCZonedDateTime dockerStateChangedDate = dockerLastUpdateStateDateProvider.lastUpdateStateDate(container);
-            dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+            newWorkerDockerEvent.fire(NewWorkerDockerEvent.newBuilder()
                     .withWorkerId(workerId)
                     .withContainer(container)
                     .withDockerStateChangedDate(dockerStateChangedDate)
                     .withStdResponses(loggingResultCallbackAdapter.getStdResponses())
                     .build());
-            final WorkerDockerContainer workerDockerContainer = WorkerDockerContainer.newBuilder()
-                    .withWorkerId(workerId)
-                    .withWorkerStatus(DockerContainerStatus
-                            .fromDockerStatus(container.getState().getStatus())
-                            .toWorkerStatus())
-                    .withLastUpdateStateDate(dockerStateChangedDate)
-                    .build();
-            workerStateChangedEvent.fire(new WorkerStateChanged(workerDockerContainer));
         } catch (final NotFoundException notFoundException) {
             // in this case the container has been removed... Expected as the user should be able to remove it
         } catch (final ConflictException conflictException) {

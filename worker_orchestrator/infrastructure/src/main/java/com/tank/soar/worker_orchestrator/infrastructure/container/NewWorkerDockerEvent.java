@@ -7,14 +7,14 @@ import com.tank.soar.worker_orchestrator.domain.WorkerId;
 import java.util.List;
 import java.util.Objects;
 
-public final class DockerStateChanged {
+public final class NewWorkerDockerEvent {
 
     private final WorkerId workerId;
     private final InspectContainerResponse container;
     private final List<StdResponse> stdResponses;
     private final UTCZonedDateTime dockerStateChangedDate;
 
-    private DockerStateChanged(final Builder builder) {
+    private NewWorkerDockerEvent(final Builder builder) {
         this.workerId = Objects.requireNonNull(builder.workerId);
         this.container = Objects.requireNonNull(builder.container);
         this.stdResponses = builder.stdResponses;// can be null
@@ -68,8 +68,8 @@ public final class DockerStateChanged {
             return this;
         }
 
-        public DockerStateChanged build() {
-            return new DockerStateChanged(this);
+        public NewWorkerDockerEvent build() {
+            return new NewWorkerDockerEvent(this);
         }
 
     }
@@ -77,8 +77,8 @@ public final class DockerStateChanged {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof DockerStateChanged)) return false;
-        DockerStateChanged that = (DockerStateChanged) o;
+        if (!(o instanceof NewWorkerDockerEvent)) return false;
+        NewWorkerDockerEvent that = (NewWorkerDockerEvent) o;
         return Objects.equals(workerId, that.workerId) &&
                 Objects.equals(container, that.container) &&
                 Objects.equals(stdResponses, that.stdResponses) &&
@@ -92,7 +92,7 @@ public final class DockerStateChanged {
 
     @Override
     public String toString() {
-        return "DockerStateChanged{" +
+        return "NewWorkerDockerEvent{" +
                 "workerId=" + workerId +
                 ", container=" + container +
                 ", stdResponses=" + stdResponses +

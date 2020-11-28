@@ -1,14 +1,14 @@
-package com.tank.soar.worker_orchestrator.infrastructure.container;
+package com.tank.soar.worker_orchestrator.infrastructure;
 
 import com.tank.soar.worker_orchestrator.domain.Worker;
 
 import java.util.Objects;
 
-public final class WorkerStateChanged {
+public final class NewWorkerEvent {
 
     private final Worker worker;
 
-    public WorkerStateChanged(final Worker worker) {
+    public NewWorkerEvent(final Worker worker) {
         this.worker = Objects.requireNonNull(worker);
     }
 
@@ -19,8 +19,8 @@ public final class WorkerStateChanged {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof WorkerStateChanged)) return false;
-        WorkerStateChanged that = (WorkerStateChanged) o;
+        if (!(o instanceof NewWorkerEvent)) return false;
+        NewWorkerEvent that = (NewWorkerEvent) o;
         return Objects.equals(worker, that.worker);
     }
 

@@ -3,6 +3,7 @@ package com.tank.soar.worker_orchestrator.infrastructure.container;
 import com.github.dockerjava.api.DockerClient;
 import com.tank.soar.worker_orchestrator.domain.*;
 import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
+import com.tank.soar.worker_orchestrator.infrastructure.NewWorkerEvent;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.agroal.DataSource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -346,10 +347,10 @@ public class DockerWorkerContainerManagerTest {
         assertThat(logsStreams.get(0).content()).isEqualTo("hello");
     }
 
-    private static LinkedBlockingDeque<DockerStateChanged> DOCKER_STATES_CHANGED = new LinkedBlockingDeque<>();
+    private static LinkedBlockingDeque<NewWorkerDockerEvent> DOCKER_STATES_CHANGED = new LinkedBlockingDeque<>();
 
-    void onDockerStateChanged(@Observes final DockerStateChanged dockerStateChanged) {
-        DOCKER_STATES_CHANGED.add(dockerStateChanged);
+    void onDockerStateChanged(@Observes final NewWorkerDockerEvent newWorkerDockerEvent) {
+        DOCKER_STATES_CHANGED.add(newWorkerDockerEvent);
     }
 
     @Test
@@ -358,25 +359,24 @@ public class DockerWorkerContainerManagerTest {
         // Given
 
         // When
-        // FCK new Runnable ???
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "print(\"hello world\")");
 
         // Then
-        final DockerStateChanged dockerStateCreated = DOCKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
+        final NewWorkerDockerEvent dockerStateCreated = DOCKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
         assertThat(dockerStateCreated.workerId()).isEqualTo(new WorkerId("id"));
         assertThat(dockerStateCreated.container().getState().getStatus()).isEqualTo("created");
-        final DockerStateChanged dockerStateRunning = DOCKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
+        final NewWorkerDockerEvent dockerStateRunning = DOCKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
         assertThat(dockerStateRunning.workerId()).isEqualTo(new WorkerId("id"));
         assertThat(dockerStateRunning.container().getState().getStatus()).isEqualTo("running");
-        final DockerStateChanged dockerStateFinished = DOCKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
+        final NewWorkerDockerEvent dockerStateFinished = DOCKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
         assertThat(dockerStateFinished.workerId()).isEqualTo(new WorkerId("id"));
         assertThat(dockerStateFinished.container().getState().getStatus()).isEqualTo("exited");
     }
 
-    private static LinkedBlockingDeque<WorkerStateChanged> WORKER_STATES_CHANGED = new LinkedBlockingDeque<>();
+    private static LinkedBlockingDeque<NewWorkerEvent> WORKER_STATES_CHANGED = new LinkedBlockingDeque<>();
 
-    void onWorkerStateChanged(@Observes final WorkerStateChanged workerStateChanged) {
-        WORKER_STATES_CHANGED.add(workerStateChanged);
+    void onWorkerStateChanged(@Observes final NewWorkerEvent newWorkerEvent) {
+        WORKER_STATES_CHANGED.add(newWorkerEvent);
     }
 
     @Test
@@ -388,13 +388,13 @@ public class DockerWorkerContainerManagerTest {
         dockerWorkerContainerManager.runScript(new WorkerId("id"), "print(\"hello world\")");
 
         // Then
-        final WorkerStateChanged workerStateCreated = WORKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
+        final NewWorkerEvent workerStateCreated = WORKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
         assertThat(workerStateCreated.worker().workerId()).isEqualTo(new WorkerId("id"));
         assertThat(workerStateCreated.worker().workerStatus()).isEqualTo(WorkerStatus.CREATED);
-        final WorkerStateChanged workerStateRunning = WORKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
+        final NewWorkerEvent workerStateRunning = WORKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
         assertThat(workerStateRunning.worker().workerId()).isEqualTo(new WorkerId("id"));
         assertThat(workerStateRunning.worker().workerStatus()).isEqualTo(WorkerStatus.RUNNING);
-        final WorkerStateChanged workerStateFinished = WORKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
+        final NewWorkerEvent workerStateFinished = WORKER_STATES_CHANGED.poll(10, TimeUnit.SECONDS);
         assertThat(workerStateFinished.worker().workerId()).isEqualTo(new WorkerId("id"));
         assertThat(workerStateFinished.worker().workerStatus()).isEqualTo(WorkerStatus.FINISHED);
     }

@@ -1,7 +1,7 @@
 package com.tank.soar.worker_orchestrator.infrastructure.interfaces.workersLifecycle;
 
 import com.tank.soar.worker_orchestrator.domain.Worker;
-import com.tank.soar.worker_orchestrator.infrastructure.container.WorkerStateChanged;
+import com.tank.soar.worker_orchestrator.infrastructure.NewWorkerEvent;
 import com.tank.soar.worker_orchestrator.infrastructure.interfaces.WorkerDTO;
 import io.quarkus.runtime.Startup;
 import org.slf4j.Logger;
@@ -58,8 +58,8 @@ public class WorkersLifecycleSocket {
         );
     }
 
-    void onWorkerStateChanged(@Observes final WorkerStateChanged workerStateChanged) {
-        workerStateChangedExecutorService.submit(() -> broadcastToEveryone(workerStateChanged.worker()));
+    void onWorkerStateChanged(@Observes final NewWorkerEvent newWorkerEvent) {
+        workerStateChangedExecutorService.submit(() -> broadcastToEveryone(newWorkerEvent.worker()));
     }
 
 // TODO  created, deleted, running, stopped...

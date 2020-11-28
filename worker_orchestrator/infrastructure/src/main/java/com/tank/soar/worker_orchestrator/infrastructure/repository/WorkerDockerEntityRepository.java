@@ -2,10 +2,10 @@ package com.tank.soar.worker_orchestrator.infrastructure.repository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.tank.soar.worker_orchestrator.domain.*;
 import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
-import com.tank.soar.worker_orchestrator.infrastructure.container.DockerStateChanged;
-import com.tank.soar.worker_orchestrator.infrastructure.container.WorkerStateChanged;
+import com.tank.soar.worker_orchestrator.infrastructure.container.NewWorkerDockerEvent;
 import io.quarkus.agroal.DataSource;
 import io.agroal.api.AgroalDataSource;
 import org.apache.commons.lang3.Validate;
@@ -49,18 +49,19 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
             "(workerId, container, logStreams, eventDate, zoneOffset, eventType) " +
             "VALUES (?, to_json(?::json), to_json(?::json), ?, ?, 'DOCKER')";
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
 
     private final AgroalDataSource workerDataSource;
     private final WorkerLockMechanism workerLockMechanism;
-    private final Event<WorkerStateChanged> workerStateChangedEvent;
+    private final Event<NewWorkerEntityEvent> newWorkerEntityEvent;
 
     public WorkerDockerEntityRepository(@DataSource("workers") final AgroalDataSource workerDataSource,
                                         @Any final WorkerLockMechanism workerLockMechanism,
-                                        final Event<WorkerStateChanged> workerStateChangedEvent) {
+                                        final Event<NewWorkerEntityEvent> newWorkerEntityEvent) {
         this.workerDataSource = Objects.requireNonNull(workerDataSource);
         this.workerLockMechanism = Objects.requireNonNull(workerLockMechanism);
-        this.workerStateChangedEvent = Objects.requireNonNull(workerStateChangedEvent);
+        this.newWorkerEntityEvent = Objects.requireNonNull(newWorkerEntityEvent);
     }
 
     @Override
@@ -68,6 +69,7 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
                                  final String script,
                                  final UTCZonedDateTime createdAt) {
         workerLockMechanism.lock(workerId);
+        final UserEventType userEventType = UserEventType.CREATION_REQUESTED;
         try (final Connection connection = workerDataSource.getConnection()) {
             try (final PreparedStatement createWorkerPreparedStatement = connection.prepareStatement(CREATE_WORKER);
                  final PreparedStatement createUserWorkerEventPreparedStatement = connection.prepareStatement(CREATE_USER_WORKER_EVENT)) {
@@ -76,7 +78,7 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
                 createWorkerPreparedStatement.setString(2, script);
                 Validate.validState(createWorkerPreparedStatement.executeUpdate() == 1);
                 createUserWorkerEventPreparedStatement.setString(1, workerId.id());
-                createUserWorkerEventPreparedStatement.setString(2, UserEventType.CREATION_REQUESTED.name());
+                createUserWorkerEventPreparedStatement.setString(2, userEventType.name());
                 createUserWorkerEventPreparedStatement.setObject(3, createdAt.localDateTime());
                 createUserWorkerEventPreparedStatement.setString(4, createdAt.zoneOffset().getId());
                 Validate.validState(createUserWorkerEventPreparedStatement.executeUpdate() == 1);
@@ -100,13 +102,11 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
         } finally {
             workerLockMechanism.unlock(workerId);
         }
-        // FIXME rework ! by doing a notification service !
-        try {
-            final Worker worker = getWorker(workerId);
-            workerStateChangedEvent.fire(new WorkerStateChanged(worker));
-        } catch (final UnknownWorkerException e) {
-            throw new RuntimeException(e);
-        }
+        newWorkerEntityEvent.fire(NewWorkerEntityEvent.newBuilder()
+                .withWorkerId(workerId)
+                .withUserEventType(userEventType)
+                .withEventDate(createdAt)
+                .withEventType(EventType.USER).build());
         return workerId;
     }
 
@@ -195,8 +195,8 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
         }
     }
 
-    void onDockerStateChanged(@Observes final DockerStateChanged dockerStateChanged) {
-        final String logStreamsAsJsonString = Optional.ofNullable(dockerStateChanged.stdResponses())
+    void onDockerStateChanged(@Observes final NewWorkerDockerEvent newWorkerDockerEvent) {
+        final String logStreamsAsJsonString = Optional.ofNullable(newWorkerDockerEvent.stdResponses())
                 .map((stdResponses) -> new StringBuilder("[")
                         .append(
                                 stdResponses
@@ -206,16 +206,16 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
                         .append("]")
                         .toString())
                 .orElse(null);
-        workerLockMechanism.lock(dockerStateChanged.workerId());
+        workerLockMechanism.lock(newWorkerDockerEvent.workerId());
         try {
-            final String container = OBJECT_MAPPER.writeValueAsString(dockerStateChanged.container());
+            final String container = OBJECT_MAPPER.writeValueAsString(newWorkerDockerEvent.container());
             try (final Connection connection = workerDataSource.getConnection();
                  final PreparedStatement createDockerStateSnapshotPreparedStatement = connection.prepareStatement(CREATE_DOCKER_WORKER_EVENT)) {
-                createDockerStateSnapshotPreparedStatement.setString(1, dockerStateChanged.workerId().id());
+                createDockerStateSnapshotPreparedStatement.setString(1, newWorkerDockerEvent.workerId().id());
                 createDockerStateSnapshotPreparedStatement.setString(2, container);
                 createDockerStateSnapshotPreparedStatement.setString(3, logStreamsAsJsonString);
-                createDockerStateSnapshotPreparedStatement.setObject(4, dockerStateChanged.dockerStateChangedDate().localDateTime());
-                createDockerStateSnapshotPreparedStatement.setString(5, dockerStateChanged.dockerStateChangedDate().zoneOffset().getId());
+                createDockerStateSnapshotPreparedStatement.setObject(4, newWorkerDockerEvent.dockerStateChangedDate().localDateTime());
+                createDockerStateSnapshotPreparedStatement.setString(5, newWorkerDockerEvent.dockerStateChangedDate().zoneOffset().getId());
                 final int created = createDockerStateSnapshotPreparedStatement.executeUpdate();
                 Validate.validState(created == 1);
             } catch (final SQLException e) {
@@ -224,7 +224,7 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);// FIXME better handle it !
         } finally {
-            workerLockMechanism.unlock(dockerStateChanged.workerId());
+            workerLockMechanism.unlock(newWorkerDockerEvent.workerId());
         }
     }
 

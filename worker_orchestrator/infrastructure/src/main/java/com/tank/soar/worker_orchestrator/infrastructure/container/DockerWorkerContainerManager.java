@@ -8,6 +8,7 @@ import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.api.model.Image;
 import com.tank.soar.worker_orchestrator.domain.*;
 import com.tank.soar.worker_orchestrator.infrastructure.WorkerLockMechanism;
+import com.tank.soar.worker_orchestrator.infrastructure.NewWorkerEvent;
 import io.quarkus.runtime.Startup;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -44,14 +45,14 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
     // max 10 // running containers TODO I should change it to be dynamic
     private final ExecutorService dockerContainersLifecycle = Executors.newFixedThreadPool(10);
 
-    private final Event<DockerStateChanged> dockerStateChangedEvent;
-    private final Event<WorkerStateChanged> workerStateChangedEvent;
+    private final Event<NewWorkerDockerEvent> dockerStateChangedEvent;
+    private final Event<NewWorkerEvent> workerStateChangedEvent;
     private final DockerLastUpdateStateDateProvider dockerLastUpdateStateDateProvider;
 
     public DockerWorkerContainerManager(final DockerClient dockerClient,
                                         @Any final WorkerLockMechanism workerLockMechanism,
-                                        final Event<DockerStateChanged> dockerStateChangedEvent,
-                                        final Event<WorkerStateChanged> workerStateChangedEvent,
+                                        final Event<NewWorkerDockerEvent> dockerStateChangedEvent,
+                                        final Event<NewWorkerEvent> workerStateChangedEvent,
                                         final DockerLastUpdateStateDateProvider dockerLastUpdateStateDateProvider) throws URISyntaxException {
         this.dockerClient = Objects.requireNonNull(dockerClient);
         this.workerLockMechanism = Objects.requireNonNull(workerLockMechanism);
@@ -124,26 +125,23 @@ public class DockerWorkerContainerManager implements WorkerContainerManager {
             workerLockMechanism.unlock(workerId);
         }
         final UTCZonedDateTime dockerStateChangedDate = dockerLastUpdateStateDateProvider.lastUpdateStateDate(containerCreated);
-        dockerStateChangedEvent.fire(DockerStateChanged.newBuilder()
+        dockerStateChangedEvent.fire(NewWorkerDockerEvent.newBuilder()
                 .withWorkerId(workerId)
                 .withContainer(containerCreated)
                 .withDockerStateChangedDate(dockerStateChangedDate)
                 .withStdResponses(Collections.emptyList())
                 .build());
-        final WorkerDockerContainer workerDockerContainer = WorkerDockerContainer.newBuilder()
+        dockerContainersLifecycle.submit(new DockerLifecycleRunnable(workerId, dockerClient,
+                dockerStateChangedEvent,
+                dockerLastUpdateStateDateProvider,
+                workerLockMechanism));
+        return WorkerDockerContainer.newBuilder()
                 .withWorkerId(workerId)
                 .withWorkerStatus(DockerContainerStatus
                         .fromDockerStatus(containerCreated.getState().getStatus())
                         .toWorkerStatus())
                 .withLastUpdateStateDate(dockerStateChangedDate)
                 .build();
-        workerStateChangedEvent.fire(new WorkerStateChanged(workerDockerContainer));
-        dockerContainersLifecycle.submit(new DockerLifecycleRunnable(workerId, dockerClient,
-                dockerStateChangedEvent,
-                workerStateChangedEvent,
-                dockerLastUpdateStateDateProvider,
-                workerLockMechanism));
-        return workerDockerContainer;
     }
 
     @Override

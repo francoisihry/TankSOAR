@@ -31,6 +31,10 @@ public final class WorkerEventEntity {
         this.userEventType = userEventType;
     }
 
+    public WorkerId workerId() {
+        return workerId;
+    }
+
     public UTCZonedDateTime eventDate() {
         return eventDate;
     }
