@@ -41,6 +41,8 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
 
     private static final String GET_WORKER = LIST_ALL_WORKERS + " WHERE w.workerId = ?";
 
+    private static final String HAS_WORKER = "SELECT EXISTS(SELECT 1 FROM WORKER WHERE workerId = ?)";
+
     public static final String CREATE_USER_WORKER_EVENT = "INSERT INTO WORKER_EVENT " +
             "(workerId, userEventType, eventDate, zoneOffset, eventType) " +
             "VALUES (?, ?, ?, ?, 'USER')";
@@ -83,13 +85,13 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
                 createUserWorkerEventPreparedStatement.setString(4, createdAt.zoneOffset().getId());
                 Validate.validState(createUserWorkerEventPreparedStatement.executeUpdate() == 1);
                 connection.commit();
-            } catch (final SQLException sqlException) {
+            } catch (final Exception exception) {
                 try {
                     connection.rollback();
                 } catch (final SQLException sqlException1) {
                     throw new RuntimeException(sqlException1);
                 }
-                throw new RuntimeException(sqlException);
+                throw new RuntimeException(exception);
             } finally {
                 try {
                     connection.setAutoCommit(true);
@@ -108,6 +110,41 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
                 .withEventDate(createdAt)
                 .withEventType(EventType.USER).build());
         return workerId;
+    }
+
+    @Override
+    public Worker markWorkerAsManuallyStopped(final WorkerId workerId,
+                                              final UTCZonedDateTime markManuallyStoppedAt) throws UnknownWorkerException {
+        workerLockMechanism.lock(workerId);
+        final UserEventType userEventType = UserEventType.WORKER_MANUALLY_STOPPED;
+        final Worker worker;
+        try (final Connection connection = workerDataSource.getConnection();
+             final PreparedStatement hasWorkerPreparedStatement = connection.prepareStatement(HAS_WORKER);
+             final PreparedStatement createUserWorkerEventPreparedStatement = connection.prepareStatement(CREATE_USER_WORKER_EVENT)) {
+            hasWorkerPreparedStatement.setString(1, workerId.id());
+            final ResultSet hasWorkerResultSet = hasWorkerPreparedStatement.executeQuery();
+            hasWorkerResultSet.next();
+            workerLockMechanism.lock(workerId);
+            if (!hasWorkerResultSet.getBoolean(1)) {
+                throw new UnknownWorkerException(workerId);
+            }
+            createUserWorkerEventPreparedStatement.setString(1, workerId.id());
+            createUserWorkerEventPreparedStatement.setString(2, userEventType.name());
+            createUserWorkerEventPreparedStatement.setObject(3, markManuallyStoppedAt.localDateTime());
+            createUserWorkerEventPreparedStatement.setString(4, markManuallyStoppedAt.zoneOffset().getId());
+            Validate.validState(createUserWorkerEventPreparedStatement.executeUpdate() == 1);
+            worker = getWorker(workerId);
+        } catch (final SQLException sqlException) {
+            throw new RuntimeException(sqlException);
+        } finally {
+            workerLockMechanism.unlock(workerId);
+        }
+        newWorkerEntityEvent.fire(NewWorkerEntityEvent.newBuilder()
+                .withWorkerId(workerId)
+                .withUserEventType(userEventType)
+                .withEventDate(markManuallyStoppedAt)
+                .withEventType(EventType.USER).build());
+        return worker;
     }
 
     @Override

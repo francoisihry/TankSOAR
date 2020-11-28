@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class WorkerEventEntity {
+public final class WorkerEventEntity implements WorkerEvent {
 
     private final WorkerId workerId;
     private final EventType eventType;
@@ -31,28 +31,29 @@ public final class WorkerEventEntity {
         this.userEventType = userEventType;
     }
 
+    @Override
     public WorkerId workerId() {
         return workerId;
     }
 
+    @Override
+    public EventType eventType() {
+        return eventType;
+    }
+
+    @Override
     public UTCZonedDateTime eventDate() {
         return eventDate;
     }
 
-    public WorkerStatus workerStatus() {
-        switch (eventType) {
-            case USER:
-                switch (userEventType) {
-                    case CREATION_REQUESTED:
-                        return WorkerStatus.CREATION_REQUESTED;
-                    default:
-                        throw new IllegalStateException("should not be here");
-                }
-            case DOCKER:
-                return dockerContainerStatus.toWorkerStatus();
-            default:
-                throw new IllegalStateException("should not be here");
-        }
+    @Override
+    public UserEventType userEventType() {
+        return userEventType;
+    }
+
+    @Override
+    public DockerContainerStatus dockerContainerStatus() {
+        return dockerContainerStatus;
     }
 
     public WorkerEventEntity(final ResultSet resultSet) throws SQLException {

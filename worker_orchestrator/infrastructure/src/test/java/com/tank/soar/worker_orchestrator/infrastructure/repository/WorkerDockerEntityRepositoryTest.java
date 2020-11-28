@@ -435,4 +435,73 @@ public class WorkerDockerEntityRepositoryTest {
         verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
     }
 
+    @Test
+    @Order(17)
+    public void should_mark_worker_as_manually_stopped() throws Exception {
+        // Given
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
+
+        // When
+        final Worker worker = workerDockerEntityRepository.markWorkerAsManuallyStopped(new WorkerId("id"),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00));
+
+        // Then
+        assertThat(worker).isEqualTo(WorkerDockerEntity
+                .newBuilder()
+                .withWorkerId(new WorkerId("id"))
+                .withWorkerEventEntities(Arrays.asList(
+                        new WorkerEventEntity(
+                                new WorkerId("id"),
+                                EventType.USER,
+                                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00),
+                                null,
+                                UserEventType.CREATION_REQUESTED
+                        ),
+                        new WorkerEventEntity(
+                                new WorkerId("id"),
+                                EventType.USER,
+                                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00),
+                                null,
+                                UserEventType.WORKER_MANUALLY_STOPPED
+                        )))
+                .build());
+    }
+
+    @Test
+    @Order(18)
+    public void should_mark_worker_as_manually_stopped_throw_unknown_worker_exception_when_worker_does_not_exist() {
+        // Given
+
+        // When && Then
+        assertThatThrownBy(() -> workerDockerEntityRepository.markWorkerAsManuallyStopped(new WorkerId("id"),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00))
+        )
+                .isInstanceOf(UnknownWorkerException.class)
+                .hasFieldOrPropertyWithValue("unknownWorkerId", new WorkerId("id"));
+    }
+
+    @Test
+    @Order(19)
+    public void should_mark_worker_as_manually_stopped_do_not_add_event_when_worker_does_not_exist() throws Exception {
+        // Given
+
+        // When
+        try {
+            workerDockerEntityRepository.markWorkerAsManuallyStopped(new WorkerId("id"),
+                    UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00));
+            fail("should have failed !");
+        } catch (final UnknownWorkerException unknownWorkerException) {
+
+        }
+
+        // Then
+        try (final Connection con = workerDataSource.getConnection();
+             final Statement stmt = con.createStatement();
+             final ResultSet countWorkerEventsRS = stmt.executeQuery("SELECT COUNT(*) FROM WORKER_EVENT")) {
+            countWorkerEventsRS.next();
+            assertThat(countWorkerEventsRS.getLong(1)).isEqualTo(0l);
+        }
+    }
+
 }

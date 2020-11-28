@@ -30,6 +30,9 @@ public class WorkerEndpointTest {
     @InjectMock
     private RunScriptUseCase runScriptUseCase;
 
+    @InjectMock
+    private StopRunningScriptUseCase stopRunningScriptUseCase;
+
     @Test
     public void should_get_worker() {
         // Given
@@ -254,6 +257,64 @@ public class WorkerEndpointTest {
                 .log().all()
                 .statusCode(400)
                 .body(equalTo("Unable to run script 'null'."));
+    }
+
+    @Test
+    public void should_stop_running_script() {
+        // Given
+        final Worker worker = mock(Worker.class);
+        doReturn(new WorkerId("id")).when(worker).workerId();
+        doReturn(WorkerStatus.FINISHED).when(worker).workerStatus();
+        doReturn(Boolean.TRUE).when(worker).hasFinished();
+        doReturn(UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 10, 00)).when(worker).lastUpdateStateDate();
+        doReturn(Source.CONTAINER).when(worker).source();
+        doReturn(worker).when(stopRunningScriptUseCase)
+                .execute(StopRunningScriptCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+
+        // When && Then
+        given()
+                .when()
+                .post("/workers/id/stopRunningScript")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .body(JsonSchemaValidator.matchesJsonSchemaInClasspath("expected/worker.json"))
+                .body("workerId", equalTo("id"))
+                .body("lastUpdateStateDate", equalTo("2020-09-01T10:10:00Z"))
+                .body("workerStatus", equalTo("FINISHED"))
+                .body("hasFinished", equalTo(Boolean.TRUE));
+    }
+
+    @Test
+    public void should_stop_running_script_return_expected_response_when_the_worker_does_not_exist() {
+        // Given
+        doThrow(new UnknownWorkerUseCaseException(new WorkerId("id"))).when(stopRunningScriptUseCase)
+                .execute(StopRunningScriptCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+
+        // When && Then
+        given()
+                .when()
+                .post("/workers/id/stopRunningScript")
+                .then()
+                .log().all()
+                .statusCode(404)
+                .body(equalTo("Unknown worker 'id'."));
+    }
+
+    @Test
+    public void should_stop_running_script_return_expected_response_when_the_worker_is_already_deleted() {
+        // Given
+        doThrow(new WorkerAlreadyDeletedUseCaseException(new WorkerId("id"))).when(stopRunningScriptUseCase)
+                .execute(StopRunningScriptCommand.newBuilder().withWorkerId(new WorkerId("id")).build());
+
+        // When && Then
+        given()
+                .when()
+                .post("/workers/id/stopRunningScript")
+                .then()
+                .log().all()
+                .statusCode(400)
+                .body(equalTo("Worker 'id' already deleted."));
     }
 
 }

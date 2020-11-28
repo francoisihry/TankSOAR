@@ -12,4 +12,6 @@ public interface WorkerRepository {
 
     List<? extends LogStream> getLog(WorkerId workerId, Boolean stdOut, Boolean stdErr) throws UnknownWorkerException;
 
+    Worker markWorkerAsManuallyStopped(WorkerId workerId, UTCZonedDateTime markManuallyStoppedAt) throws UnknownWorkerException;
+
 }

@@ -54,7 +54,9 @@ public class LoggingFrameSocket {
     public void onClose(Session session, @PathParam("workerId") String workerId) {
         final String sessionId = session.getId();
         try {
-            loggingFrameSocketResultCallbackAdapterBySessionId.get(sessionId).close();
+            if (loggingFrameSocketResultCallbackAdapterBySessionId.containsKey(sessionId)) {
+                loggingFrameSocketResultCallbackAdapterBySessionId.get(sessionId).close();
+            }
         } catch (IOException ioException) {
             ioException.printStackTrace();
         } finally {
@@ -66,7 +68,9 @@ public class LoggingFrameSocket {
     public void onError(Session session, @PathParam("workerId") String workerId, Throwable throwable) {
         final String sessionId = session.getId();
         try {
-            loggingFrameSocketResultCallbackAdapterBySessionId.get(sessionId).close();
+            if (loggingFrameSocketResultCallbackAdapterBySessionId.containsKey(sessionId)) {
+                loggingFrameSocketResultCallbackAdapterBySessionId.get(sessionId).close();
+            }
         } catch (IOException ioException) {
             loggingFrameSocketResultCallbackAdapterBySessionId.remove(sessionId);
         }

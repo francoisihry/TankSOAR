@@ -3,10 +3,11 @@ package com.tank.soar.worker_orchestrator.infrastructure.repository;
 import com.tank.soar.worker_orchestrator.domain.UTCZonedDateTime;
 import com.tank.soar.worker_orchestrator.domain.WorkerId;
 import com.tank.soar.worker_orchestrator.domain.WorkerStatus;
+import com.tank.soar.worker_orchestrator.infrastructure.container.DockerContainerStatus;
 
 import java.util.Objects;
 
-public final class NewWorkerEntityEvent {
+public final class NewWorkerEntityEvent implements WorkerEvent {
 
     private final WorkerId workerId;
     private final EventType eventType;
@@ -24,28 +25,29 @@ public final class NewWorkerEntityEvent {
         return new Builder();
     }
 
+    @Override
     public WorkerId workerId() {
         return workerId;
     }
 
+    @Override
     public EventType eventType() {
         return eventType;
     }
 
+    @Override
     public UTCZonedDateTime eventDate() {
         return eventDate;
     }
 
+    @Override
     public UserEventType userEventType() {
         return userEventType;
     }
 
-    public WorkerStatus workerStatus() {
-        if (UserEventType.CREATION_REQUESTED.equals(userEventType)) {
-            return WorkerStatus.CREATION_REQUESTED;
-        } else {
-            throw new IllegalStateException();
-        }
+    @Override
+    public DockerContainerStatus dockerContainerStatus() {
+        throw new UnsupportedOperationException("It is an user event !");
     }
 
     public static final class Builder {

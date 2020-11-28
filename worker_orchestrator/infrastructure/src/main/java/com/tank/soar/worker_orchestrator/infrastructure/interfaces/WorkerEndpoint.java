@@ -18,15 +18,18 @@ public class WorkerEndpoint {
     private final ListWorkersUseCase listWorkersUseCase;
     private final RetrieveWorkerLogsUseCase retrieveWorkerLogsUseCase;
     private final RunScriptUseCase runScriptUseCase;
+    private final StopRunningScriptUseCase stopRunningScriptUseCase;
 
     public WorkerEndpoint(final GetWorkerUseCase getWorkerUseCase,
                           final ListWorkersUseCase listWorkersUseCase,
                           final RetrieveWorkerLogsUseCase retrieveWorkerLogsUseCase,
-                          final RunScriptUseCase runScriptUseCase) {
+                          final RunScriptUseCase runScriptUseCase,
+                          final StopRunningScriptUseCase stopRunningScriptUseCase) {
         this.getWorkerUseCase = Objects.requireNonNull(getWorkerUseCase);
         this.listWorkersUseCase = Objects.requireNonNull(listWorkersUseCase);
         this.retrieveWorkerLogsUseCase = Objects.requireNonNull(retrieveWorkerLogsUseCase);
         this.runScriptUseCase = Objects.requireNonNull(runScriptUseCase);
+        this.stopRunningScriptUseCase = Objects.requireNonNull(stopRunningScriptUseCase);
     }
 
     @GET
@@ -76,6 +79,16 @@ public class WorkerEndpoint {
     @Produces(MediaType.APPLICATION_JSON)
     public WorkerDTO runScript(@FormParam("script") final String script) throws UnableToRunScriptUseCaseException {
         return Optional.of(runScriptUseCase.execute(RunScriptCommand.newBuilder().withScript(script).build()))
+                .map(WorkerDTO::new)
+                .get();
+    }
+
+    @POST
+    @Path("/{workerId}/stopRunningScript")
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Produces(MediaType.APPLICATION_JSON)
+    public WorkerDTO stopRunningScript(@PathParam("workerId") final String workerId) throws UseCaseException {
+        return Optional.of(stopRunningScriptUseCase.execute(StopRunningScriptCommand.newBuilder().withWorkerId(new WorkerId(workerId)).build()))
                 .map(WorkerDTO::new)
                 .get();
     }

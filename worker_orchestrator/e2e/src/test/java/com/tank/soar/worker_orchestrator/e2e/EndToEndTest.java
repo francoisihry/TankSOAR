@@ -272,5 +272,39 @@ public class EndToEndTest {
 
         }
     }
+
+    @Test
+    public void should_manually_stop_worker() {
+        // Given
+        final String script = Stream.of("import time;",
+                "time.sleep(60);",
+                "print('hello');")
+                .collect(Collectors.joining());
+        final String workerId = given()
+                .formParam("script", script)
+                .when()
+                .post("/workers/runScript")
+                .then()
+                .log().all()
+                .statusCode(200)
+                .extract().path("workerId");
+
+        // When && Then
+        given()
+                .when()
+                .post("/workers/" + workerId + "/stopRunningScript")
+                .then()
+                .log().all()
+                .statusCode(200);
+
+        long nbOfWorkerContainers = dockerClient.listContainersCmd()
+                .withLabelFilter(Collections.singleton("workerId"))
+                .withShowAll(true)
+                .exec()
+                .stream()
+                .count();
+        assertThat(nbOfWorkerContainers).isEqualTo(0l);
+    }
+
     // TODO faire des tests de performance en bombardant la creation de containers ...
 }

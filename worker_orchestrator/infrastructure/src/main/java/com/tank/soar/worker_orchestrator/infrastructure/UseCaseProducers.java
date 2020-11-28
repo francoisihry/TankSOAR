@@ -51,4 +51,10 @@ public class UseCaseProducers {
         return new RunScriptUseCase(workerContainerManager, workerRepository, workerIdProvider, utcZonedDateTimeProvider);
     }
 
+    @Produces
+    @ApplicationScoped
+    public StopRunningScriptUseCase produceStopRunningScriptUseCase() {
+        return new StopRunningScriptUseCase(workerContainerManager, workerRepository, utcZonedDateTimeProvider);
+    }
+
 }
