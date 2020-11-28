@@ -470,6 +470,24 @@ public class WorkerDockerEntityRepositoryTest {
 
     @Test
     @Order(18)
+    public void should_mark_worker_as_manually_stopped_use_locking_mechanism() throws Exception {
+        // Given
+        final InOrder inOrder = inOrder(workerLockMechanism);
+        workerDockerEntityRepository.createWorker(new WorkerId("id"), "print(\"hello world\")",
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 00, 00));
+
+        // When
+        workerDockerEntityRepository.markWorkerAsManuallyStopped(new WorkerId("id"),
+                UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00));
+
+        // Then
+        inOrder.verify(workerLockMechanism, times(1)).lock(new WorkerId("id"));
+        // I do not know how to check that the query has been done between
+        inOrder.verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
+    }
+
+    @Test
+    @Order(19)
     public void should_mark_worker_as_manually_stopped_throw_unknown_worker_exception_when_worker_does_not_exist() {
         // Given
 
@@ -482,7 +500,25 @@ public class WorkerDockerEntityRepositoryTest {
     }
 
     @Test
-    @Order(19)
+    @Order(20)
+    public void should_mark_worker_as_manually_stopped_be_unlocked_when_worker_does_not_exist() {
+        // Given
+
+        // When
+        try {
+            workerDockerEntityRepository.markWorkerAsManuallyStopped(new WorkerId("id"),
+                    UTCZonedDateTime.of(2020, Month.SEPTEMBER, 1, 10, 01, 00));
+            fail("should have failed !");
+        } catch (final UnknownWorkerException unknownWorkerException) {
+
+        }
+
+        // Then
+        verify(workerLockMechanism, times(1)).unlock(new WorkerId("id"));
+    }
+
+    @Test
+    @Order(21)
     public void should_mark_worker_as_manually_stopped_do_not_add_event_when_worker_does_not_exist() throws Exception {
         // Given
 

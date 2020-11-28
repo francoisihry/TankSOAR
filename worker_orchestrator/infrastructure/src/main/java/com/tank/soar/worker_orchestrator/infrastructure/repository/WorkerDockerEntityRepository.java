@@ -115,7 +115,6 @@ public class WorkerDockerEntityRepository implements WorkerRepository {
     @Override
     public Worker markWorkerAsManuallyStopped(final WorkerId workerId,
                                               final UTCZonedDateTime markManuallyStoppedAt) throws UnknownWorkerException {
-        workerLockMechanism.lock(workerId);
         final UserEventType userEventType = UserEventType.WORKER_MANUALLY_STOPPED;
         final Worker worker;
         try (final Connection connection = workerDataSource.getConnection();

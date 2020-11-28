@@ -16,7 +16,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.mockito.InjectMock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,7 +101,6 @@ public class WorkersLifecycleSocketTest {
         }
     }
 
-    @Disabled// FIXME race condition when running all tests ... Fuck off !!!
     @Test
     public void should_consume_worker_lifecycle() throws Exception {
         // Given
